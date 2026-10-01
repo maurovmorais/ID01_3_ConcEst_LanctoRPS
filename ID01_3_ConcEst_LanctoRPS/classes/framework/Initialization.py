@@ -11,6 +11,7 @@ from ID01_3_ConcEst_LanctoRPS.classes.utils.ScreenRecorder import ScreenRecorder
 from ID01_3_ConcEst_LanctoRPS.classes.utils.Exceptions import BusinessRuleException
 from ID01_3_ConcEst_LanctoRPS.classes.utils.RobotStream import RobotStream
 from ID01_3_ConcEst_LanctoRPS.classes.queue.QueueManager import QueueManager
+from ID01_3_ConcEst_LanctoRPS.classes.queue.QueueManagerPerformer import QueueManagerPerformer
 from ID01_3_ConcEst_LanctoRPS.classes.dados_execucao.DadosExecucao import DadosExecucao
 from ID01_3_ConcEst_LanctoRPS.classes.email.send.SendEmail import SendEmail
 from ID01_3_ConcEst_LanctoRPS.classes.email.send.SendEmailOutlook import SendEmailOutlook
@@ -67,9 +68,11 @@ class Initialization:
                                                  dias_para_atualizar=3)
 
             # Insere um registro no banco com dados com informacoes do inicio da execucao
-            DadosExecucao.inserir_tabela_dados_execucao(QueueManager.items_queue)
+            #DadosExecucao.inserir_tabela_dados_execucao(QueueManager.items_queue)
+            DadosExecucao.inserir_tabela_dados_execucao(QueueManagerPerformer.items_queue)
 
-            Log.write_log("Itens encontrados na fila antes de adicionar novos itens a fila: " + QueueManager.items_queue.__str__())
+            #Log.write_log("Itens encontrados na fila antes de adicionar novos itens a fila: " + QueueManager.items_queue.__str__())
+            Log.write_log("Itens encontrados na fila antes de adicionar novos itens a fila: " + QueueManagerPerformer.items_queue.__str__())
             
             # Enviando email de inicialização
             if(InitAllSettings.config["EmailInicial"].upper() == "SIM"):
@@ -88,10 +91,12 @@ class Initialization:
             InitAllApplications.execute(first_run=True)
 
             # Realiza o update da quantidade de itens a serem processados
-            DadosExecucao.update_tabela_dados_execucao_itens_new(QueueManager.items_queue)
+            #DadosExecucao.update_tabela_dados_execucao_itens_new(QueueManager.items_queue)
+            DadosExecucao.update_tabela_dados_execucao_itens_new(QueueManagerPerformer.items_queue)
             
             # Atualiza no InitAllSettings a quantidade de itens que estão a serem processados
-            InitAllSettings.qtd_itens_a_processar_ini_exec = QueueManager.items_queue
+            #InitAllSettings.qtd_itens_a_processar_ini_exec = QueueManager.items_queue
+            InitAllSettings.qtd_itens_a_processar_ini_exec = QueueManagerPerformer.items_queue
 
             Log.write_log("Initialization Finished")
 

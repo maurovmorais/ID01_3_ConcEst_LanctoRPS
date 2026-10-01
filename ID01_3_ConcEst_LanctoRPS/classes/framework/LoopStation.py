@@ -9,6 +9,7 @@ from ID01_3_ConcEst_LanctoRPS.classes.utils.Log import Log, LogLevel, ErrorType
 from ID01_3_ConcEst_LanctoRPS.classes.utils.ExecutionControl import ExecutionControl
 from ID01_3_ConcEst_LanctoRPS.classes.utils.Exceptions import BusinessRuleException, TerminateException
 from ID01_3_ConcEst_LanctoRPS.classes.queue.QueueManager import QueueManager
+from ID01_3_ConcEst_LanctoRPS.classes.queue.QueueManagerPerformer import QueueManagerPerformer
 from ID01_3_ConcEst_LanctoRPS.classes.framework.Process import Process
 from ID01_3_ConcEst_LanctoRPS.classes.email.send.SendEmail import SendEmail
 from ID01_3_ConcEst_LanctoRPS.classes.email.send.SendEmailOutlook import SendEmailOutlook
@@ -76,7 +77,8 @@ class LoopStation:
                     datahora_fim_item_str = datahora_fim_item.strftime("%d/%m/%Y %H:%M:%S")
                     
                     # Marcando item como finalizado com sucesso
-                    QueueManager.update_status_item()
+                    #QueueManager.update_status_item()
+                    QueueManagerPerformer.update_status_item()
                     
 
                     # Realiza update na tabela de dados do item e insere que ocorreu sucesso
@@ -122,7 +124,8 @@ class LoopStation:
                     KillAllProcesses.execute()
                     
                     #Marcando item como erro de business
-                    QueueManager.update_status_item(excecao=err, obs=err.__str__())
+                    #QueueManager.update_status_item(excecao=err, obs=err.__str__())
+                    QueueManagerPerformer.update_status_item(excecao=err, obs=err.__str__())
 
                     # Realiza o update dos dados do item no banco de dados da execucao 
                     DadosExecucao.update_tabela_dados_itens('FALHA','NEGOCIO',err.__str__(),caminho_screenshot)
@@ -142,7 +145,8 @@ class LoopStation:
                     # Caso seja direcionado para esse tipoe de excecao significa que o processo nao precisou seguir até o final para resultar em sucesso, preciso ser parado previamente
                     
                     # Marcando item como finalizado com sucesso
-                    QueueManager.update_status_item()
+                    #QueueManager.update_status_item()
+                    QueueManagerPerformer.update_status_item()
                     
 
                     # Realiza update na tabela de dados do item e insere que ocorreu sucesso
@@ -185,7 +189,8 @@ class LoopStation:
                         
 
                     if(tentativa+1 == InitAllSettings.config["MaxRetryNumber"]):
-                        QueueManager.update_status_item(excecao=err, obs=traceback_erro)
+                        #QueueManager.update_status_item(excecao=err, obs=traceback_erro)
+                        QueueManagerPerformer.update_status_item(excecao=err, obs=traceback_erro)
                         #Enviando email com print do erro
                         if(InitAllSettings.config["EmailCadaErro"].upper() == "SIM"):          
                             SendEmail.send_email_erro(business=False, 

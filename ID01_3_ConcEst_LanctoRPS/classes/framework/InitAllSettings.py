@@ -129,7 +129,8 @@ class InitAllSettings:
         cls.caminho_template_email_erro_encontrado = os.path.join(ROOT_DIR , "resources\\templates\\Email_ErroEncontrado.txt")
 
         # Caminho hardcode utilizados em templates e scripts para relatorio final
-        cls.sqlite_caminho_bd_analit_sint = cls.config["CaminhoBancoSqlite"] if(cls.config.__contains__("CaminhoBancoSqlite")) else os.path.join(ROOT_DIR, "resources\\sqlite\\banco_dados.db")
+        #cls.sqlite_caminho_bd_analit_sint = cls.config["CaminhoBancoSqlite"] if(cls.config.__contains__("CaminhoBancoSqlite")) else os.path.join(ROOT_DIR, "resources\\sqlite\\banco_dados.db")
+        cls.sqlite_caminho_bd_analit_sint = cls.config["CaminhoBancoSqlite_Performer"] if(cls.config.__contains__("CaminhoBancoSqlite_Performer")) else os.path.join(ROOT_DIR, "resources\\sqlite\\banco_dados.db")
         cls.caminho_template_excel_analitico = os.path.join(ROOT_DIR, "resources\\templates\\Relatorio_Analitico.xlsx")
         cls.caminho_template_excel_sintetico = os.path.join(ROOT_DIR, "resources\\templates\\Relatorio_Sintetico.xlsx")
         cls.caminho_script_select_dados_analitico = os.path.join(ROOT_DIR,r'resources\scripts\analitico_sintetico\Script_Select_Analitico.sql')

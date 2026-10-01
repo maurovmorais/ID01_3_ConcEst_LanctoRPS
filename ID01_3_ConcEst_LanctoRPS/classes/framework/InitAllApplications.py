@@ -5,10 +5,8 @@ from ID01_3_ConcEst_LanctoRPS.classes.utils.Log import Log, LogLevel, ErrorType
 from ID01_3_ConcEst_LanctoRPS.classes.utils.Exceptions import BusinessRuleException
 from ID01_3_ConcEst_LanctoRPS.classes.queue.QueueManager import QueueManager
 import ID01_3_ConcEst_LanctoRPS.classes.utils.GenericReusable as GenericReusable
-
-#FIXME Código Exemplo REMOVER
-from ID01_3_ConcEst_LanctoRPS.classes.chrome.google.Homepage import GoogleHomepage
 from ID01_3_ConcEst_LanctoRPS.classes.framework.InitAllSettings import Browser
+from ID01_3_ConcEst_LanctoRPS.classes.site.softcase import fazer_login_softcase
 
 class InitAllApplications:
     """
@@ -33,12 +31,8 @@ class InitAllApplications:
 
         Parâmetros:
         """
-        #FIXME Código Exemplo REMOVER
-        info_adicional = {'valor_pesquisa':'cotação atual do dólar'}
-        QueueManager.insert_new_queue_item(referencia=str(1),inf_adicional=info_adicional)
+       
 
-
-        
     @classmethod
     def execute(cls, first_run=False):
         """
@@ -67,9 +61,14 @@ class InitAllApplications:
         for tentativa in range(max_tentativas):
             try:
                 Log.write_log("Iniciando aplicativos, tentativa " + (tentativa+1).__str__())
- 
+                #Login site Softcase
                 InitAllSettings.initiate_web_manipulator(headless=False, browser_escolhido=Browser.CHROME)
+                cls.web_driver = InitAllSettings.web_driver
+                fazer_login_softcase(driver=cls.web_driver)
+                # TODO: Implementar codigo
+                #Download do relatorio antes dos lançamentos
                 
+
             except BusinessRuleException as err:
                 raise err
             except Exception as err:
@@ -79,7 +78,7 @@ class InitAllApplications:
                 if(tentativa+1 == max_tentativas): 
                     raise err
                 else: 
-                    # Inclua aqui o código responsável para reiniciar ao estado indicado para iniciar as aplicações novamente
+                    fazer_login_softcase(driver=cls.web_driver)
                     continue
             else:
                 Log.write_log("InitAllApplications Finished")

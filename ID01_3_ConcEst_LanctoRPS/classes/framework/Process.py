@@ -6,7 +6,7 @@ from ID01_3_ConcEst_LanctoRPS.classes.utils.Exceptions import BusinessRuleExcept
 from ID01_3_ConcEst_LanctoRPS.classes.framework.GetTransaction import GetTransaction
 #FIXME Código Exemplo REMOVER
 from ID01_3_ConcEst_LanctoRPS.classes.chrome.google.Homepage import GoogleHomepage
-from ID01_3_ConcEst_LanctoRPS.classes.site.softcase import fazer_login_softcase,navegar_RPSConsolidados
+from ID01_3_ConcEst_LanctoRPS.classes.site.softcase import navegar_RPSConsolidados
 
 # Imports dos pacotes externos
 from time import sleep
@@ -38,31 +38,45 @@ class Process:
         """
         cls.web_driver = InitAllSettings.web_driver
 
-        Log.write_log('Process Started')
+        dado = GetTransaction.queue_item['info_adicionais'][0]
+        referencia = GetTransaction.queue_item['referencia']
+        adquirente = dado['adquirente']
+        nome_empresa = dado['softacase']
+        bandeira = dado['bandeira']
+        valor_taxa = dado['valor_taxa']
+        taxa_adquirente = dado['taxa_adquirente']
+        forma_pagto = dado['forma_pagto']
+        valor = dado['valor']
+      
+        #Faz lançamento dos RPS
+        if referencia == 'Cielo/Pix':
+            pass
+        elif referencia == 'Cielo/DEBITO':
+            pass
+        elif referencia == 'Cielo/Crédito à vista':
+            pass
+        elif referencia == 'Cielo/Crédito pré-pago':
+            pass
+        elif referencia == 'Cielo/Crédito conversor de moedas':
+            pass
+        elif referencia == 'ConectCar/TAG':
+            pass
+        elif referencia == 'Greenpass/TAG':
+            pass
+        elif referencia == 'SemParar/TAG':
+            pass
+        elif referencia == 'Veloe/TAG':
+            pass
+        elif referencia == 'Bradesco/PIX':
+            pass
+        else:
+            Log.write_log(f'Adquirente: {adquirente} ou a forma de pagto {forma_pagto} não encontradas')
 
-        #Informa valor no campo de pesquisa
-        #nome_empresa = GetTransaction.queue_item['info_adicionais']['nome_empresa']
-        #texto_simples = GetTransaction.queue_item['info_adicionais']['texto_simples']
-        #texto_alvo = GetTransaction.queue_item['info_adicionais']['texto_alvo']
-        #valor_total = GetTransaction.queue_item['info_adicionais']['valor_total']
-        #taxa = GetTransaction.queue_item['info_adicionais']['taxa']
-        #forma_pagamento = GetTransaction.queue_item['info_adicionais']['forma_pagamento']
-
-        #TODO APAGAR APÓS DESENVOLVIMENTO
-        ##-------------------------------------
-        nome_empresa = 'JARAGUA DO SUL (WPS)'
-        texto_simples = 'débito'
-        texto_alvo = 'DÉBITO VISA'
-        valor_total = ''
-        taxa = ''
-        ##-------------------------------------
-
-        sleep(5)
-
-        #Login site Softcase
-        fazer_login_softcase(driver=cls.web_driver)
+        #Volta a tela inicial da Pesquisa
+        # TODO: Implementar codigo
 
         #Navegar e Aplicar as Alterações
-        navegar_RPSConsolidados(driver=cls.web_driver,empresa=nome_empresa,forma_pagamento=texto_simples,alvo=texto_alvo)
+        #navegar_RPSConsolidados(driver=cls.web_driver,empresa=nome_empresa,forma_pagamento=texto_simples,alvo=texto_alvo)
 
         Log.write_log('Process Finished')
+        print()

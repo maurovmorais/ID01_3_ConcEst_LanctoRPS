@@ -4,6 +4,7 @@ from ID01_3_ConcEst_LanctoRPS.classes.framework.InitAllSettings import InitAllSe
 from ID01_3_ConcEst_LanctoRPS.classes.utils.Log import Log, LogLevel, ErrorType
 from ID01_3_ConcEst_LanctoRPS.classes.utils.ExecutionControl import ExecutionControl
 from ID01_3_ConcEst_LanctoRPS.classes.queue.QueueManager import QueueManager
+from ID01_3_ConcEst_LanctoRPS.classes.queue.QueueManagerPerformer import QueueManagerPerformer
 from ID01_3_ConcEst_LanctoRPS.classes.utils.Exceptions import BusinessRuleException,TerminateException
 from ID01_3_ConcEst_LanctoRPS.classes.dados_execucao.DadosExecucao import DadosExecucao
 
@@ -37,17 +38,20 @@ class GetTransaction:
             cls.queue_item = None
             raise TerminateException("Interrupção da execução foi solicitada.")
         else:
-            cls.queue_item = QueueManager.get_next_queue_item()
+            #cls.queue_item = QueueManager.get_next_queue_item()
+            cls.queue_item = QueueManagerPerformer.get_next_queue_item()
             
 
         #Processamento continua até a classe informar que não existe itens novos para processar
         if(cls.queue_item is not None): 
             DadosExecucao.refresh_counting_items()
+            Log.write_log('Process Started')
             Log.write_log(f"{str(InitAllSettings.qtde_itens_processados)} itens processados de {InitAllSettings.qtd_itens_a_processar_ini_exec} totais para serem processados.")
             Log.write_log(mensagem_log=f"Executando item {str(InitAllSettings.qtde_itens_processados+1)} de {InitAllSettings.qtd_itens_a_processar_ini_exec}, referência: " + cls.queue_item['referencia'], referencia=cls.queue_item['referencia'] )
 
         else:
             DadosExecucao.refresh_counting_items()
+            Log.write_log('Process Started')
             Log.write_log(f"{str(InitAllSettings.qtde_itens_processados)} itens processados de {InitAllSettings.qtd_itens_a_processar_ini_exec} totais para serem processados.")
             
             Log.write_log("Não existem itens a serem processados.")
