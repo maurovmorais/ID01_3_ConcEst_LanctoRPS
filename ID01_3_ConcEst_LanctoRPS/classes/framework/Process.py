@@ -41,7 +41,7 @@ class Process:
         dado = GetTransaction.queue_item['info_adicionais'][0]
         referencia = GetTransaction.queue_item['referencia']
         adquirente = dado['adquirente']
-        nome_empresa = dado['softacase']
+        nome_empresa = dado['softcase']
         bandeira = dado['bandeira']
         valor_taxa = dado['valor_taxa']
         taxa_adquirente = dado['taxa_adquirente']
