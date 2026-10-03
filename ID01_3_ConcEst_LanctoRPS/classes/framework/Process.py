@@ -1,38 +1,57 @@
 # Imports dos módulos internos do projeto
-# Carrega o InitAllSettingssSettings Precisa ser o primeiro a ser carregado
+# Carrega o InitAllSettings Precisa ser o primeiro a ser carregado
 from ID01_3_ConcEst_LanctoRPS.classes.framework.InitAllSettings import InitAllSettings
 from ID01_3_ConcEst_LanctoRPS.classes.utils.Log import Log, LogLevel, ErrorType
 from ID01_3_ConcEst_LanctoRPS.classes.utils.Exceptions import BusinessRuleException
 from ID01_3_ConcEst_LanctoRPS.classes.framework.GetTransaction import GetTransaction
-#FIXME Código Exemplo REMOVER
-from ID01_3_ConcEst_LanctoRPS.classes.chrome.google.Homepage import GoogleHomepage
-from ID01_3_ConcEst_LanctoRPS.classes.site.softcase import navegar_RPSConsolidados
+from ID01_3_ConcEst_LanctoRPS.classes.site.softcase import (
+    pesquisar_empresa,
+    filtrar_forma_pagto,
+    atualizar_dados,
+    editar_rps_consolidado,
+)
 
 # Imports dos pacotes externos
 from time import sleep
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from time import sleep
 
-# Classe responsável pelo processamento principal, necessário preencher com o seu código no método execute
+
+# referencia -> (forma_pagto recebida, texto da forma no SoftCase)
+FORMA_PAGTO_SOFTCASE: dict[str, tuple[str, str]] = {
+    'Cielo/Pix': ('Pix', 'PIX'),
+    'Cielo/DEBITO': ('DEBITO', 'DÉBITO'),
+    'Cielo/Crédito à vista': ('Crédito à vista', 'CRÉDITO'),
+    'Cielo/Crédito pré-pago': ('Crédito pré-pago', 'CRÉDITO'),
+    'Cielo/Crédito conversor de moedas': (
+        'Crédito conversor de moedas',
+        'CRÉDITO CONVERSOR DE MOEDAS',
+    ),
+    'ConectCar/TAG': ('TAG', 'TAG'),
+    'Greenpass/TAG': ('TAG', 'TAG'),
+    'SemParar/TAG': ('TAG', 'TAG'),
+    'Veloe/TAG': ('TAG', 'TAG'),
+    'Bradesco/PIX': ('PIX', 'PIX'),
+}
+
+
+# Classe responsável pelo processamento principal
 class Process:
     """
     Classe responsável pelo processamento principal.
 
     Parâmetros:
-    
+
     Retorna:
     """
     _config = InitAllSettings.config
-    
+
     @classmethod
     def execute(cls):
         """
         Método principal para execução do código.
 
-
         Parâmetros:
-
 
         Retorna:
         """
@@ -44,39 +63,73 @@ class Process:
         nome_empresa = dado['softcase']
         bandeira = dado['bandeira']
         valor_taxa = dado['valor_taxa']
-        taxa_adquirente = dado['taxa_adquirente']
         forma_pagto = dado['forma_pagto']
         valor = dado['valor']
-      
-        #Faz lançamento dos RPS
-        if referencia == 'Cielo/Pix':
-            pass
-        elif referencia == 'Cielo/DEBITO':
-            pass
-        elif referencia == 'Cielo/Crédito à vista':
-            pass
-        elif referencia == 'Cielo/Crédito pré-pago':
-            pass
-        elif referencia == 'Cielo/Crédito conversor de moedas':
-            pass
-        elif referencia == 'ConectCar/TAG':
-            pass
-        elif referencia == 'Greenpass/TAG':
-            pass
-        elif referencia == 'SemParar/TAG':
-            pass
-        elif referencia == 'Veloe/TAG':
-            pass
-        elif referencia == 'Bradesco/PIX':
-            pass
-        else:
-            Log.write_log(f'Adquirente: {adquirente} ou a forma de pagto {forma_pagto} não encontradas')
 
-        #Volta a tela inicial da Pesquisa
-        # TODO: Implementar codigo
+        # Pesquisa a empresa
+        pesquisar_empresa(driver=cls.web_driver, empresa=nome_empresa)
 
-        #Navegar e Aplicar as Alterações
-        #navegar_RPSConsolidados(driver=cls.web_driver,empresa=nome_empresa,forma_pagamento=texto_simples,alvo=texto_alvo)
+        # Faz lançamento dos RPS
+        cls._processar_referencia(
+            referencia=referencia,
+            adquirente=adquirente,
+            forma_pagto=forma_pagto,
+            bandeira=bandeira,
+            valor=valor,
+            valor_taxa=valor_taxa,
+        )
+
 
         Log.write_log('Process Finished')
-        print()
+
+    @classmethod
+    def _processar_referencia(
+        cls,
+        referencia: str,
+        adquirente: str,
+        forma_pagto: str,
+        bandeira: str | None,
+        valor: float,
+        valor_taxa: float,
+    ) -> None:
+        """Direciona o lançamento conforme a referência (adquirente/forma)."""
+        if referencia not in FORMA_PAGTO_SOFTCASE:
+            Log.write_log(
+                f'Adquirente: {adquirente} ou a forma de pagto '
+                f'{forma_pagto} não encontradas (referência: {referencia})'
+            )
+            return
+
+        forma_original, forma_softcase = FORMA_PAGTO_SOFTCASE[referencia]
+        # Adequa para o SoftCase
+        if forma_pagto == forma_original:
+            forma_pagto = forma_softcase
+
+        cls._lancar(forma_pagto, bandeira, valor, valor_taxa)
+
+    @classmethod
+    def _lancar(
+        cls,
+        forma_pagto: str,
+        bandeira: str | None,
+        valor: float,
+        valor_taxa: float,
+    ) -> None:
+        """Filtra a forma de pagamento no SoftCase e edita o RPS."""
+        bandeira_cartao = str(bandeira).strip().upper() if bandeira else ''
+        forma_pagamento = f'{forma_pagto} {bandeira_cartao}'.strip()
+
+        # Filtrar forma pagamento
+        filtrar_forma_pagto(
+            driver=cls.web_driver,
+            forma_pgto=forma_pagamento,
+            bandeira=bandeira,
+        )
+        # Editar dados
+        atualizar_dados(driver=cls.web_driver)
+        sleep(1)  # ideal: trocar por WebDriverWait
+        editar_rps_consolidado(
+            driver=cls.web_driver,
+            valor=valor,
+            total_taxa=valor_taxa,
+        )

@@ -28,7 +28,7 @@ Uso típico:
 
 import logging
 from datetime import date, datetime, timedelta
-
+from ID01_3_ConcEst_LanctoRPS.classes.framework.InitAllSettings import InitAllSettings
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -36,6 +36,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 logger = logging.getLogger(__name__)
+from pathlib import Path
+import time
 
 TIMEOUT_PADRAO = 10
 
@@ -59,7 +61,6 @@ CSS_BOTAO_MES_ATUAL = "button.mud-button-month"
 CSS_BOTAO_MES_ANTERIOR = "button.mud-picker-nav-button-prev"
 CSS_BOTAO_MES_PROXIMO = "button.mud-picker-nav-button-next"
 CSS_DIAS_VISIVEIS = "button.mud-picker-calendar-day:not(.mud-hidden)"
-
 
 class SeletorDataError(Exception):
     """Erro genérico ao interagir com o MudDatePicker."""
@@ -273,3 +274,4 @@ def obter_intervalo_ontem():
     
     # Retorna o intervalo repetido
     return f"{ontem_formatado}"
+

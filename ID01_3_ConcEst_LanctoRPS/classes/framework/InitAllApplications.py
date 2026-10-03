@@ -6,7 +6,13 @@ from ID01_3_ConcEst_LanctoRPS.classes.utils.Exceptions import BusinessRuleExcept
 from ID01_3_ConcEst_LanctoRPS.classes.queue.QueueManager import QueueManager
 import ID01_3_ConcEst_LanctoRPS.classes.utils.GenericReusable as GenericReusable
 from ID01_3_ConcEst_LanctoRPS.classes.framework.InitAllSettings import Browser
-from ID01_3_ConcEst_LanctoRPS.classes.site.softcase import fazer_login_softcase
+from ID01_3_ConcEst_LanctoRPS.classes.site.softcase import fazer_login_softcase,download_antes_alteracao
+
+
+from time import sleep
+from pathlib import Path
+from datetime import datetime,timedelta
+import os
 
 class InitAllApplications:
     """
@@ -57,17 +63,22 @@ class InitAllApplications:
 
         #Edite o valor dessa variável a no arquivo Config.xlsx
         max_tentativas = cls._config["MaxRetryNumber"]
+
+        # Calcula a data de ontem (D-1)
+        data_ontem = datetime.now() - timedelta(days=1)
+        caminho_download = InitAllSettings.config['relatorio_rps_antes']
         
         for tentativa in range(max_tentativas):
             try:
                 Log.write_log("Iniciando aplicativos, tentativa " + (tentativa+1).__str__())
                 #Login site Softcase
-                InitAllSettings.initiate_web_manipulator(headless=False, browser_escolhido=Browser.CHROME)
+                InitAllSettings.initiate_web_manipulator(headless=False, browser_escolhido=Browser.CHROME,pasta_download=caminho_download)
                 cls.web_driver = InitAllSettings.web_driver
                 fazer_login_softcase(driver=cls.web_driver)
-                # TODO: Implementar codigo
-                #Download do relatorio antes dos lançamentos
                 
+                #Download do relatorio antes dos lançamentos
+                #download_antes_alteracao(driver=cls.web_driver)
+
 
             except BusinessRuleException as err:
                 raise err

@@ -27,7 +27,7 @@ from ID01_3_ConcEst_LanctoRPS.classes.utils.CredentialWindows import obter_crede
 from ID01_3_ConcEst_LanctoRPS.classes.framework.InitAllSettings import InitAllSettings
 from ID01_3_ConcEst_LanctoRPS.classes.utils.util_data import obter_intervalo_ontem,definir_data
 from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_selecionar_qtde_itens import definir_itens_por_pagina
-from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_forma_pagamento import selecionar_autocomplete
+from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_forma_pagamento import selecionar_autocomplete,_aguardar_selecao_assentar,clicar_com_fallback,selecionar_e_pesquisar
 from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_remover_linha_debito import remover_duplicatas_forma_pagamento
 from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_remover_linha_vazia import remover_linhas_com_celula_vazia
 
@@ -53,6 +53,17 @@ TIMEOUT_PADRAO_SEGUNDOS = 60
 TIMEOUT_PADRAO = 15
 TENTATIVAS_MAXIMAS = 3
 ESPERA_ENTRE_TENTATIVAS_SEGUNDOS = 3
+
+XPATH_ITEM_EDITAR = (
+    "//div[contains(@class,'mud-list-item-clickable')]"
+    "[.//p[normalize-space()='Editar']]"
+)
+
+XPATH_DIALOGO = "//div[@role='dialog'][.//h6[contains(., 'Editar RPS Consolidado')]]"
+XPATH_BTN_ATUALIZAR = (
+    f"{XPATH_DIALOGO}//button[@type='submit']"
+    "[normalize-space(.)='Atualizar']"
+)
 
 
 def fazer_login_softcase(
@@ -147,11 +158,9 @@ def fazer_login_softcase(
     ) from ultima_excecao
 
 
-
-
-def navegar_RPSConsolidados(driver: WebDriver,empresa:str,forma_pagamento:str,alvo:str) -> None:
+def pesquisar_empresa(driver: WebDriver,empresa:str) -> None:
     """
-    Navega até a aba Estadia do Taggy
+    Nagevar até 
 
     """
     timeout: int = TIMEOUT_PADRAO_SEGUNDOS
@@ -160,14 +169,12 @@ def navegar_RPSConsolidados(driver: WebDriver,empresa:str,forma_pagamento:str,al
         time.sleep(3)
         driver.get('https://rps.portalsoftcase.com.br/softrps/rpsconsolidateds')
 
-        time.sleep(3)
         espera = WebDriverWait(driver, timeout)
 
         campo_email = espera.until(
             EC.visibility_of_element_located(SELETOR_CAMPO_PESQUISA)
         )
         
-
         #Expandir campo Pesquisa
         campo_pesquisar_exp = driver.find_element(By.XPATH,'/html/body/div[1]/div/div[3]/div[2]/div/div[4]/div[1]')
         campo_pesquisar_exp.click()
@@ -193,50 +200,142 @@ def navegar_RPSConsolidados(driver: WebDriver,empresa:str,forma_pagamento:str,al
         time.sleep(0.5)                                        
         botao_pesquisar.send_keys(Keys.ENTER)
 
+    except Exception:
+        Log.write_log("Falha em pesquisar a empresa")
+        raise
+
+
+def filtrar_forma_pagto(driver: WebDriver,forma_pgto:str, bandeira:str) -> None:
+
+    try:
+       
         #Leitura da Tabela de dados
         tabela_xpath = '//*[@id="app"]/div/div[3]/div[2]/div/div[5]/div[3]/table/tbody'
 
         #Excluir linhas com colunas em branco
-        #remover_linhas_com_celula_vazia(driver)
+        time.sleep(3)
+        remover_linhas_com_celula_vazia(driver)
 
-        #Forma de pagamento
-        if forma_pagamento == 'débito':
-            #Regra para apagar linhas duplicadas mantendo apenas 1 item
-            #remover_duplicatas_forma_pagamento(driver,xpath_tabela=tabela_xpath,filtro_prefixo=texto_generico)
-
-            xpath_campo_forma_pagamento = '/html/body/div[1]/div/div[3]/div[2]/div/div[4]/div[2]/div/div/div/div[2]/div/div[7]/div/div/div/div[1]/input'
-            selecionar_autocomplete(
-                driver=driver,
-                xpath_campo_input=xpath_campo_forma_pagamento,
-                texto_busca=forma_pagamento,
-                texto_item_alvo=alvo,)
-
-            #Botão Pesquisar
-            botao_pesquisar = driver.find_element(By.XPATH,'//*[@id="app"]/div/div[3]/div[2]/div/div[4]/div[2]/div/div/div/div[2]/div/div[8]/button[2]')
-            botao_pesquisar.click()
-
-            #Leitura da Tabela de dados
-            # tabela = driver.find_element(By.XPATH,'//*[@id="app"]/div/div[3]/div[2]/div/div[5]/div[3]/table/tbody')
-            # dados_tabela = tabela.text
-
-            #Validar se existe linhas duplicadas conforme forma de pagamento
-
-            #Alterar valor e taxa
-
-            #Download Relatorio
-
-        elif forma_pagamento == 'crédito':
-            pass
-        else:
-            pass
+        xpath_campo_forma_pagamento = '/html/body/div[1]/div/div[3]/div[2]/div/div[4]/div[2]/div/div/div/div[2]/div/div[7]/div/div/div/div[1]/input'
+       
+        # #Botão Pesquisar
+        botao_pesquisar = '//*[@id="app"]/div/div[3]/div[2]/div/div[4]/div[2]/div/div/div/div[2]/div/div[8]/button[2]'
         
-        print()
-
+        selecionar_e_pesquisar(
+            driver,
+            xpath_campo_input=xpath_campo_forma_pagamento,
+            texto_busca=forma_pgto,
+            texto_item_alvo=forma_pgto,
+            xpath_botao_pesquisar=botao_pesquisar ,
+        )
+        
     
+        #Leitura da Tabela de dados
+        # tabela = driver.find_element(By.XPATH,'//*[@id="app"]/div/div[3]/div[2]/div/div[5]/div[3]/table/tbody')
+        # dados_tabela = tabela.text
+
+        #Regra para apagar linhas duplicadas mantendo apenas 1 item
+        #remover_duplicatas_forma_pagamento(driver,xpath_tabela=tabela_xpath,filtro_prefixo=forma_pagamento)
+
+
     except Exception:
-        Log.write_log("Falha em navegar telas")
+        Log.write_log("Falha em filtrar o pagto")
         raise
 
+def atualizar_dados(driver: WebDriver) -> None:
+    try:
+        driver = driver
+        #Clicar no botão ações
+        time.sleep(2)
+        botao_acoes = driver.find_element(By.XPATH,'/html/body/div[1]/div/div[3]/div[2]/div/div[5]/div[3]/table/tbody/tr/td[1]/div')
+        botao_acoes.click()
+        #Clicar em Editar
+        clicar_editar(driver)
+
+    except Exception:
+        Log.write_log("Falha em atualizar dados")
+        raise
+
+def clicar_editar(driver: WebDriver, timeout: int = 15) -> None:
+    """Clica na opção 'Editar' do menu (mud-list) já aberto.
+
+    Raises:
+        TimeoutException: se a opção não ficar clicável no tempo limite.
+    """
+    try:
+        item = WebDriverWait(driver, timeout).until(
+            EC.element_to_be_clickable((By.XPATH, XPATH_ITEM_EDITAR))
+        )
+        item.click()
+        logger.info("Opção 'Editar' clicada.")
+    except TimeoutException:
+        logger.error("Opção 'Editar' não encontrada ou não clicável.")
+        raise
+
+# Alterar os valores do campos
+def _xpath_input_por_label(label: str) -> str:
+    """Monta o XPath do <input> a partir do texto do label no diálogo."""
+    return (
+        f"{XPATH_DIALOGO}"
+        "//div[contains(@class,'mud-input-control-input-container')]"
+        f"[.//label[normalize-space()='{label}']]//input"
+    )
+
+
+def _preencher_campo(
+    driver: WebDriver, label: str, valor: str, timeout: int
+) -> None:
+    """Limpa e preenche um campo MudBlazor, disparando o evento de change."""
+    campo: WebElement = WebDriverWait(driver, timeout).until(
+        EC.element_to_be_clickable((By.XPATH, _xpath_input_por_label(label)))
+    )
+    campo.click()
+    campo.send_keys(Keys.CONTROL, "a")
+    campo.send_keys(Keys.DELETE)
+    campo.send_keys(valor)
+    # O Blazor só registra o valor no evento "change" (ao perder o foco).
+    campo.send_keys(Keys.TAB)
+    logger.info("Campo '%s' preenchido com '%s'.", label, valor)
+
+
+def editar_rps_consolidado(
+    driver: WebDriver,
+    valor: str,
+    total_taxa: str,
+    timeout: int = 15,
+) -> None:
+    """Preenche 'Valor' e 'Total taxa' no diálogo e clica em 'Atualizar'.
+
+    Args:
+        driver: WebDriver com o diálogo 'Editar RPS Consolidado' aberto.
+        valor: valor do campo 'Valor' (ex.: "660" ou "1.250,50").
+        total_taxa: valor do campo 'Total taxa' (ex.: "7,19").
+        timeout: tempo máximo de espera, em segundos.
+
+    Raises:
+        TimeoutException: se algum elemento não ficar disponível a tempo.
+    """
+    try:
+        WebDriverWait(driver, timeout).until(
+            EC.visibility_of_element_located((By.XPATH, XPATH_DIALOGO))
+        )
+
+        _preencher_campo(driver, "Valor", valor, timeout)
+        _preencher_campo(driver, "Total taxa", total_taxa, timeout)
+
+        WebDriverWait(driver, timeout).until(
+            EC.element_to_be_clickable((By.XPATH, XPATH_BTN_ATUALIZAR))
+        ).click()
+        logger.info("Botão 'Atualizar' clicado.")
+
+        # Confirma que o diálogo fechou (salvou sem erro de validação).
+        WebDriverWait(driver, timeout).until(
+            EC.invisibility_of_element_located((By.XPATH, XPATH_DIALOGO))
+        )
+    except TimeoutException:
+        logger.error("Falha ao editar RPS Consolidado (timeout).")
+        raise
+        
 
 def _salvar_diagnostico(driver: WebDriver, contexto: str) -> None:
     """Salva o HTML da página e uma screenshot para depuração.
@@ -341,3 +440,30 @@ def selecionar_empresa(
         raise
 
     logger.info("Empresa '%s' selecionada com sucesso", nome_empresa)
+
+
+def download_antes_alteracao(driver: WebDriver) -> None:
+    """
+    Navega até a aba Estadia do Taggy
+
+    """
+    timeout: int = TIMEOUT_PADRAO_SEGUNDOS
+    try:
+        #Navega para a Tela
+        time.sleep(3)
+        driver.get('https://rps.portalsoftcase.com.br/softrps/rpsconsolidateds')
+
+        time.sleep(3)
+        espera = WebDriverWait(driver, timeout)
+
+        campo_email = espera.until(
+            EC.visibility_of_element_located(SELETOR_CAMPO_PESQUISA)
+        )
+        #Botão Download Relatorio antes da alteraçao
+        botao_download = driver.find_element(By.XPATH,'/html/body/div[1]/div/div[3]/div[2]/div/div[5]/div[1]/div[1]/div/button[1]/span')
+        botao_download.click()
+        print()
+
+    except Exception:
+        Log.write_log("Falha download antes da alteração")
+        raise
