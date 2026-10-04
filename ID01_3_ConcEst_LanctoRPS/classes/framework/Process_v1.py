@@ -10,11 +10,6 @@ from ID01_3_ConcEst_LanctoRPS.classes.site.softcase import (
     atualizar_dados,
     editar_rps_consolidado,
 )
-from ID01_3_ConcEst_LanctoRPS.classes.site.credito_pre_pago import (
-    lancar_credito_pre_pago,
-)
-from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_pix import lancar_pix
-from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_tag import atualizar_tag
 
 # Imports dos pacotes externos
 from time import sleep
@@ -83,8 +78,6 @@ class Process:
             bandeira=bandeira,
             valor=valor,
             valor_taxa=valor_taxa,
-            nome_empresa=nome_empresa,
-            dias_comp=dias_comp,
         )
 
 
@@ -99,8 +92,6 @@ class Process:
         bandeira: str | None,
         valor: float,
         valor_taxa: float,
-        nome_empresa: str,
-        dias_comp: str,
     ) -> None:
         """Direciona o lançamento conforme a referência (adquirente/forma)."""
         if referencia not in FORMA_PAGTO_SOFTCASE:
@@ -111,55 +102,11 @@ class Process:
             return
 
         forma_original, forma_softcase = FORMA_PAGTO_SOFTCASE[referencia]
-
-        # Crédito pré-pago: cria um novo lançamento (módulo separado).
-        # Precisa vir antes da adequação ao SoftCase, que troca o texto.
-        if forma_pagto == 'Crédito pré-pago':
-            lancar_credito_pre_pago(
-                driver=cls.web_driver,
-                nome_empresa=nome_empresa,
-                valor=valor,
-                valor_taxa=valor_taxa,
-                dias_comp=dias_comp,
-                bandeira=bandeira,
-            )
-            return
-
-        # Pix: cria um novo lançamento (módulo separado).
-        # Também precisa vir antes da adequação ao SoftCase ('Pix' -> 'PIX').
-        if forma_pagto == 'Pix':
-            lancar_pix(
-                driver=cls.web_driver,
-                nome_empresa=nome_empresa,
-                valor=valor,
-                valor_taxa=valor_taxa,
-                dias_comp=dias_comp,
-            )
-            return
-
-        # TAG: mesmo fluxo do débito (filtra e atualiza o RPS existente),
-        # em módulo separado; a forma de pagamento considera o adquirente
-        # (ex.: 'TAG <adquirente>'). Antes da adequação ao SoftCase.
-        if forma_pagto == 'TAG':
-            atualizar_tag(
-                driver=cls.web_driver,
-                adquirente=adquirente,
-                valor=valor,
-                valor_taxa=valor_taxa,
-            )
-            return
-
-        # Crédito à vista também atualiza o campo Dias Comp.
-        # Decidido antes da adequação, que troca o texto da forma.
-        dias_comp_edicao = dias_comp if forma_pagto == 'Crédito à vista' else None
-
         # Adequa para o SoftCase
         if forma_pagto == forma_original:
             forma_pagto = forma_softcase
 
-        cls._lancar(
-            forma_pagto, bandeira, valor, valor_taxa, dias_comp_edicao
-        )
+        cls._lancar(forma_pagto, bandeira, valor, valor_taxa)
 
     @classmethod
     def _lancar(
@@ -168,12 +115,8 @@ class Process:
         bandeira: str | None,
         valor: float,
         valor_taxa: float,
-        dias_comp: str | None = None,
     ) -> None:
-        """Filtra a forma de pagamento no SoftCase e edita o RPS.
-
-        Se dias_comp for informado, o campo Dias Comp. também é atualizado.
-        """
+        """Filtra a forma de pagamento no SoftCase e edita o RPS."""
         bandeira_cartao = str(bandeira).strip().upper() if bandeira else ''
         forma_pagamento = f'{forma_pagto} {bandeira_cartao}'.strip()
 
@@ -190,5 +133,4 @@ class Process:
             driver=cls.web_driver,
             valor=valor,
             total_taxa=valor_taxa,
-            dias_comp=dias_comp,
         )

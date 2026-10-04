@@ -14,7 +14,6 @@ from ID01_3_ConcEst_LanctoRPS.classes.site.credito_pre_pago import (
     lancar_credito_pre_pago,
 )
 from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_pix import lancar_pix
-from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_tag import atualizar_tag
 
 # Imports dos pacotes externos
 from time import sleep
@@ -134,18 +133,6 @@ class Process:
                 valor=valor,
                 valor_taxa=valor_taxa,
                 dias_comp=dias_comp,
-            )
-            return
-
-        # TAG: mesmo fluxo do débito (filtra e atualiza o RPS existente),
-        # em módulo separado; a forma de pagamento considera o adquirente
-        # (ex.: 'TAG <adquirente>'). Antes da adequação ao SoftCase.
-        if forma_pagto == 'TAG':
-            atualizar_tag(
-                driver=cls.web_driver,
-                adquirente=adquirente,
-                valor=valor,
-                valor_taxa=valor_taxa,
             )
             return
 

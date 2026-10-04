@@ -214,7 +214,7 @@ def filtrar_forma_pagto(driver: WebDriver,forma_pgto:str, bandeira:str) -> None:
 
         #Excluir linhas com colunas em branco
         time.sleep(3)
-        remover_linhas_com_celula_vazia(driver)
+        #remover_linhas_com_celula_vazia(driver)
 
         xpath_campo_forma_pagamento = '/html/body/div[1]/div/div[3]/div[2]/div/div[4]/div[2]/div/div/div/div[2]/div/div[7]/div/div/div/div[1]/input'
        
@@ -303,6 +303,7 @@ def editar_rps_consolidado(
     valor: str,
     total_taxa: str,
     timeout: int = 15,
+    dias_comp: str | None = None,
 ) -> None:
     """Preenche 'Valor' e 'Total taxa' no diálogo e clica em 'Atualizar'.
 
@@ -311,6 +312,7 @@ def editar_rps_consolidado(
         valor: valor do campo 'Valor' (ex.: "660" ou "1.250,50").
         total_taxa: valor do campo 'Total taxa' (ex.: "7,19").
         timeout: tempo máximo de espera, em segundos.
+        dias_comp: se informado, preenche também o campo 'Dias Comp.'.
 
     Raises:
         TimeoutException: se algum elemento não ficar disponível a tempo.
@@ -322,6 +324,8 @@ def editar_rps_consolidado(
 
         _preencher_campo(driver, "Valor", valor, timeout)
         _preencher_campo(driver, "Total taxa", total_taxa, timeout)
+        if dias_comp is not None:
+            _preencher_campo(driver, "Dias Comp.", str(dias_comp), timeout)
 
         WebDriverWait(driver, timeout).until(
             EC.element_to_be_clickable((By.XPATH, XPATH_BTN_ATUALIZAR))
@@ -335,7 +339,6 @@ def editar_rps_consolidado(
     except TimeoutException:
         logger.error("Falha ao editar RPS Consolidado (timeout).")
         raise
-        
 
 def _salvar_diagnostico(driver: WebDriver, contexto: str) -> None:
     """Salva o HTML da página e uma screenshot para depuração.
