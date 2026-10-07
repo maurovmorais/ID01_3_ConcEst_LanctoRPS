@@ -30,6 +30,9 @@ from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_selecionar_qtde_itens import
 from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_forma_pagamento import selecionar_autocomplete,_aguardar_selecao_assentar,clicar_com_fallback,selecionar_e_pesquisar
 from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_remover_linha_debito import remover_duplicatas_forma_pagamento
 from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_remover_linha_vazia import remover_linhas_com_celula_vazia
+from ID01_3_ConcEst_LanctoRPS.classes.utils.remover_linhas_duplicadas import remover_linhas_duplicadas
+from ID01_3_ConcEst_LanctoRPS.classes.utils.excluir_linhas_softcase import criar_excluir_linha
+
 
 import logging
 from datetime import datetime
@@ -212,15 +215,27 @@ def filtrar_forma_pagto(driver: WebDriver,forma_pgto:str, bandeira:str) -> None:
         #Leitura da Tabela de dados
         tabela_xpath = '//*[@id="app"]/div/div[3]/div[2]/div/div[5]/div[3]/table/tbody'
 
-        #Excluir linhas com colunas em branco
-        time.sleep(3)
-        #remover_linhas_com_celula_vazia(driver)
+        # #Excluir linhas com colunas em branco.
+        # time.sleep(3)
+        # remover_linhas_com_celula_vazia(driver)
 
+        # #Remover linhas Duplicadas
+        # #excluir = criar_excluir_linha(driver)
+        # #resultado = remover_linhas_duplicadas(driver.page_source, excluir=excluir)
+        # resultado = remover_linhas_duplicadas(driver.page_source)
+
+        # Log.write_log(
+        #     f"Duplicadas encontradas: {len(resultado.removidas)} "
+        #     f"({[d['Numero'] for d in resultado.removidas]})"
+        # )
+
+        #Campo Forma de Pagamento
         xpath_campo_forma_pagamento = '/html/body/div[1]/div/div[3]/div[2]/div/div[4]/div[2]/div/div/div/div[2]/div/div[7]/div/div/div/div[1]/input'
        
         # #Botão Pesquisar
         botao_pesquisar = '//*[@id="app"]/div/div[3]/div[2]/div/div[4]/div[2]/div/div/div/div[2]/div/div[8]/button[2]'
         
+        #Selecionar forma de pagamento e confirmar
         selecionar_e_pesquisar(
             driver,
             xpath_campo_input=xpath_campo_forma_pagamento,
@@ -230,14 +245,6 @@ def filtrar_forma_pagto(driver: WebDriver,forma_pgto:str, bandeira:str) -> None:
         )
         
     
-        #Leitura da Tabela de dados
-        # tabela = driver.find_element(By.XPATH,'//*[@id="app"]/div/div[3]/div[2]/div/div[5]/div[3]/table/tbody')
-        # dados_tabela = tabela.text
-
-        #Regra para apagar linhas duplicadas mantendo apenas 1 item
-        #remover_duplicatas_forma_pagamento(driver,xpath_tabela=tabela_xpath,filtro_prefixo=forma_pagamento)
-
-
     except Exception:
         Log.write_log("Falha em filtrar o pagto")
         raise
@@ -445,7 +452,7 @@ def selecionar_empresa(
     logger.info("Empresa '%s' selecionada com sucesso", nome_empresa)
 
 
-def download_antes_alteracao(driver: WebDriver) -> None:
+def download_relatorio_softcase(driver: WebDriver) -> None:
     """
     Navega até a aba Estadia do Taggy
 
@@ -465,7 +472,7 @@ def download_antes_alteracao(driver: WebDriver) -> None:
         #Botão Download Relatorio antes da alteraçao
         botao_download = driver.find_element(By.XPATH,'/html/body/div[1]/div/div[3]/div[2]/div/div[5]/div[1]/div[1]/div/button[1]/span')
         botao_download.click()
-        print()
+        
 
     except Exception:
         Log.write_log("Falha download antes da alteração")

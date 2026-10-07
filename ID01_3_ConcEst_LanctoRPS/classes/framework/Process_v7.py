@@ -14,7 +14,6 @@ from ID01_3_ConcEst_LanctoRPS.classes.site.credito_pre_pago import (
     lancar_credito_pre_pago,
 )
 from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_pix import lancar_pix
-from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_dinheiro import lancar_dinheiro
 from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_tag import atualizar_tag
 from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_conversor_moedas import (
     lancar_credito_conversor_moedas,
@@ -40,7 +39,6 @@ FORMA_PAGTO_SOFTCASE: dict[str, tuple[str, str]] = {
         'Crédito conversor de moedas',
         'CRÉDITO CONVERSOR DE MOEDAS',
     ),
-    'Cielo/DINHEIRO': ('DINHEIRO', 'DINHEIRO'),  # CONFIRMAR a referência
     'ConectCar/TAG': ('TAG', 'TAG'),
     'Greenpass/TAG': ('TAG', 'TAG'),
     'SemParar/TAG': ('TAG', 'TAG'),
@@ -153,19 +151,6 @@ class Process:
         # Também precisa vir antes da adequação ao SoftCase ('Pix' -> 'PIX').
         if forma_pagto == 'Pix':
             lancar_pix(
-                driver=cls.web_driver,
-                nome_empresa=nome_empresa,
-                valor=valor,
-                valor_taxa=valor_taxa,
-                dias_comp=dias_comp,
-            )
-            return
-
-        # DINHEIRO: filtra e atualiza o RPS existente; se não houver
-        # opção para alterar, cria um NOVO (módulo separado, nos moldes
-        # do Pix). Antes da adequação ao SoftCase.
-        if forma_pagto == 'DINHEIRO':
-            lancar_dinheiro(
                 driver=cls.web_driver,
                 nome_empresa=nome_empresa,
                 valor=valor,

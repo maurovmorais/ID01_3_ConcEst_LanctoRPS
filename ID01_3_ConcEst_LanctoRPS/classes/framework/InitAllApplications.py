@@ -6,7 +6,7 @@ from ID01_3_ConcEst_LanctoRPS.classes.utils.Exceptions import BusinessRuleExcept
 from ID01_3_ConcEst_LanctoRPS.classes.queue.QueueManager import QueueManager
 import ID01_3_ConcEst_LanctoRPS.classes.utils.GenericReusable as GenericReusable
 from ID01_3_ConcEst_LanctoRPS.classes.framework.InitAllSettings import Browser
-from ID01_3_ConcEst_LanctoRPS.classes.site.softcase import fazer_login_softcase,download_antes_alteracao
+from ID01_3_ConcEst_LanctoRPS.classes.site.softcase import fazer_login_softcase,download_relatorio_softcase
 
 
 from time import sleep
@@ -77,7 +77,7 @@ class InitAllApplications:
                 fazer_login_softcase(driver=cls.web_driver)
                 
                 #Download do relatorio antes dos lançamentos
-                #download_antes_alteracao(driver=cls.web_driver)
+                #download_relatorio_softcase(driver=cls.web_driver)
 
 
             except BusinessRuleException as err:

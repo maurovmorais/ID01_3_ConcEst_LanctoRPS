@@ -3,8 +3,8 @@
 from ID01_3_ConcEst_LanctoRPS.classes.framework.InitAllSettings import InitAllSettings
 from ID01_3_ConcEst_LanctoRPS.classes.utils.Log import Log, LogLevel, ErrorType
 from ID01_3_ConcEst_LanctoRPS.classes.utils.Exceptions import BusinessRuleException
-#FIXME Código Exemplo REMOVER
-from ID01_3_ConcEst_LanctoRPS.classes.chrome.google.Homepage import GoogleHomepage
+from ID01_3_ConcEst_LanctoRPS.classes.framework.KillAllProcesses import KillAllProcesses
+
 
 # Imports dos pacotes externos
 
@@ -42,9 +42,9 @@ class CloseAllApplications:
                 Log.write_log("Finalizando todos os processos, tentativa " + (tentativa+1).__str__())
                 #Insira aqui seu código para fechar os aplicativos
                 
-                #FIXME Código Exemplo REMOVER
-
-                GoogleHomepage.close_google_website()
+                #GoogleHomepage.close_google_website()
+                # Chamando a classe KillAllProcesses em caso de erro de business
+                KillAllProcesses.execute(['chrome.exe'])
 
 
             except BusinessRuleException as err:

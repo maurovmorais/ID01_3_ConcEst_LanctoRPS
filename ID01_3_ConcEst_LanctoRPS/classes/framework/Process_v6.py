@@ -14,15 +14,10 @@ from ID01_3_ConcEst_LanctoRPS.classes.site.credito_pre_pago import (
     lancar_credito_pre_pago,
 )
 from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_pix import lancar_pix
-from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_dinheiro import lancar_dinheiro
 from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_tag import atualizar_tag
 from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_conversor_moedas import (
     lancar_credito_conversor_moedas,
 )
-from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_remover_linha_debito import remover_duplicatas_forma_pagamento
-from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_remover_linha_vazia import remover_linhas_com_celula_vazia
-from ID01_3_ConcEst_LanctoRPS.classes.utils.remover_linhas_duplicadas import remover_linhas_duplicadas
-from ID01_3_ConcEst_LanctoRPS.classes.utils.excluir_linhas_softcase import criar_excluir_linha
 
 # Imports dos pacotes externos
 from time import sleep
@@ -40,7 +35,6 @@ FORMA_PAGTO_SOFTCASE: dict[str, tuple[str, str]] = {
         'Crédito conversor de moedas',
         'CRÉDITO CONVERSOR DE MOEDAS',
     ),
-    'Cielo/DINHEIRO': ('DINHEIRO', 'DINHEIRO'),  # CONFIRMAR a referência
     'ConectCar/TAG': ('TAG', 'TAG'),
     'Greenpass/TAG': ('TAG', 'TAG'),
     'SemParar/TAG': ('TAG', 'TAG'),
@@ -111,21 +105,6 @@ class Process:
         nome_empresa: str,
         dias_comp: str,
     ) -> None:
-
-        #Excluir AS linhas com colunas em branco.
-        sleep(3)
-        remover_linhas_com_celula_vazia(cls.web_driver)
-
-        #Remover linhas Duplicadas
-        #excluir = criar_excluir_linha(cls.web_driver)
-        #resultado = remover_linhas_duplicadas(cls.web_driver .page_source, excluir=excluir)
-        resultado = remover_linhas_duplicadas(cls.web_driver.page_source)
-
-        Log.write_log(
-            f"Duplicadas encontradas: {len(resultado.removidas)} "
-            f"({[d['Numero'] for d in resultado.removidas]})"
-        )
-
         """Direciona o lançamento conforme a referência (adquirente/forma)."""
         if referencia not in FORMA_PAGTO_SOFTCASE:
             Log.write_log(
@@ -161,19 +140,6 @@ class Process:
             )
             return
 
-        # DINHEIRO: filtra e atualiza o RPS existente; se não houver
-        # opção para alterar, cria um NOVO (módulo separado, nos moldes
-        # do Pix). Antes da adequação ao SoftCase.
-        if forma_pagto == 'DINHEIRO':
-            lancar_dinheiro(
-                driver=cls.web_driver,
-                nome_empresa=nome_empresa,
-                valor=valor,
-                valor_taxa=valor_taxa,
-                dias_comp=dias_comp,
-            )
-            return
-
         # TAG: mesmo fluxo do débito (filtra e atualiza o RPS existente),
         # em módulo separado; a forma de pagamento considera o adquirente
         # (ex.: 'TAG <adquirente>'). Antes da adequação ao SoftCase.
@@ -195,6 +161,7 @@ class Process:
                 valor=valor,
                 valor_taxa=valor_taxa,
                 dias_comp=dias_comp,
+                bandeira=bandeira,
             )
             return
 

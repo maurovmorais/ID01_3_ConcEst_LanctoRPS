@@ -95,9 +95,7 @@ class Process:
         else:
             Log.write_log(f'Adquirente: {adquirente} ou a forma de pagto {forma_pagto} não encontradas')
 
-        #Volta a tela inicial da Pesquisa
-        # TODO: Implementar codigo
-
+     
         
         Log.write_log('Process Finished')
         print()
