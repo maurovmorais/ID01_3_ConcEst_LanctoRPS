@@ -16,9 +16,11 @@ from ID01_3_ConcEst_LanctoRPS.classes.site.credito_pre_pago import (
 from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_pix import lancar_pix
 from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_dinheiro import lancar_dinheiro
 from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_tag import atualizar_tag
+
 from ID01_3_ConcEst_LanctoRPS.classes.site.lancamento_conversor_moedas import (
     lancar_credito_conversor_moedas,
 )
+
 from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_remover_linha_debito import remover_duplicatas_forma_pagamento
 from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_remover_linha_vazia import remover_linhas_com_celula_vazia
 from ID01_3_ConcEst_LanctoRPS.classes.utils.remover_linhas_duplicadas import remover_linhas_duplicadas
@@ -76,10 +78,16 @@ class Process:
         adquirente = dado['adquirente']
         nome_empresa = dado['softcase']
         bandeira = dado['bandeira']
+        bandeira = (
+                bandeira.strip().upper()
+                if isinstance(bandeira, str) and bandeira.strip()
+                else None
+        )
         valor_taxa = dado['valor_taxa']
         forma_pagto = dado['forma_pagto']
         valor = dado['valor']
         dias_comp = dado['dias_comp']
+        forma_pagamento = dado['forma_pagamento']
 
         # Pesquisa a empresa
         pesquisar_empresa(driver=cls.web_driver, empresa=nome_empresa)
@@ -94,6 +102,7 @@ class Process:
             valor_taxa=valor_taxa,
             nome_empresa=nome_empresa,
             dias_comp=dias_comp,
+            forma_pagamento=forma_pagamento,
         )
 
 
@@ -110,6 +119,7 @@ class Process:
         valor_taxa: float,
         nome_empresa: str,
         dias_comp: str,
+        forma_pagamento: str,
     ) -> None:
 
         #Excluir AS linhas com colunas em branco.
@@ -117,8 +127,8 @@ class Process:
         remover_linhas_com_celula_vazia(cls.web_driver)
 
         #Remover linhas Duplicadas
-        #excluir = criar_excluir_linha(cls.web_driver)
-        #resultado = remover_linhas_duplicadas(cls.web_driver .page_source, excluir=excluir)
+        excluir = criar_excluir_linha(cls.web_driver)
+        resultado = remover_linhas_duplicadas(cls.web_driver .page_source, excluir=excluir)
         resultado = remover_linhas_duplicadas(cls.web_driver.page_source)
 
         Log.write_log(
@@ -134,27 +144,27 @@ class Process:
             )
             return
 
-        forma_original, forma_softcase = FORMA_PAGTO_SOFTCASE[referencia]
-
-        # Crédito pré-pago: cria um novo lançamento (módulo separado).
-        # Precisa vir antes da adequação ao SoftCase, que troca o texto.
+       
+        
         if forma_pagto == 'Crédito pré-pago':
+            Log.write_log(f'Forma de pagamento (fila): {forma_pagamento}')
             lancar_credito_pre_pago(
                 driver=cls.web_driver,
                 nome_empresa=nome_empresa,
+                forma_pagto=forma_pagamento,
                 valor=valor,
                 valor_taxa=valor_taxa,
                 dias_comp=dias_comp,
-                bandeira=bandeira,
             )
             return
+       
 
-        # Pix: cria um novo lançamento (módulo separado).
-        # Também precisa vir antes da adequação ao SoftCase ('Pix' -> 'PIX').
-        if forma_pagto == 'Pix':
+        if str(forma_pagto).strip().casefold() == 'pix':
+            Log.write_log(f'Forma de pagamento (fila): {forma_pagamento}')
             lancar_pix(
                 driver=cls.web_driver,
                 nome_empresa=nome_empresa,
+                forma_pagto=forma_pagamento,
                 valor=valor,
                 valor_taxa=valor_taxa,
                 dias_comp=dias_comp,
@@ -168,6 +178,7 @@ class Process:
             lancar_dinheiro(
                 driver=cls.web_driver,
                 nome_empresa=nome_empresa,
+                forma_pagamento=forma_pagamento,
                 valor=valor,
                 valor_taxa=valor_taxa,
                 dias_comp=dias_comp,
@@ -180,40 +191,43 @@ class Process:
         if forma_pagto == 'TAG':
             atualizar_tag(
                 driver=cls.web_driver,
-                adquirente=adquirente,
+                forma_pagamento=forma_pagamento,
                 valor=valor,
                 valor_taxa=valor_taxa,
             )
             return
 
-        # Crédito conversor de moedas: cria um novo lançamento (NOVO) em
-        # módulo separado. Antes da adequação ao SoftCase, que troca o texto.
+  
+
         if forma_pagto == 'Crédito conversor de moedas':
+            Log.write_log(f'Forma de pagamento (fila): {forma_pagamento}')
             lancar_credito_conversor_moedas(
                 driver=cls.web_driver,
                 nome_empresa=nome_empresa,
+                forma_pagto=forma_pagamento,
                 valor=valor,
                 valor_taxa=valor_taxa,
                 dias_comp=dias_comp,
             )
             return
 
+
         # Crédito à vista também atualiza o campo Dias Comp.
         # Decidido antes da adequação, que troca o texto da forma.
         dias_comp_edicao = dias_comp if forma_pagto == 'Crédito à vista' else None
 
-        # Adequa para o SoftCase
-        if forma_pagto == forma_original:
-            forma_pagto = forma_softcase
+
+        # Forma de pagamento do SoftCase vem da fila (forma_pagamento)
+        Log.write_log(f'Forma de pagamento (fila): {forma_pagamento}')
 
         cls._lancar(
-            forma_pagto, bandeira, valor, valor_taxa, dias_comp_edicao
+            forma_pagamento, bandeira, valor, valor_taxa, dias_comp_edicao
         )
 
     @classmethod
     def _lancar(
         cls,
-        forma_pagto: str,
+        forma_pagamento: str,
         bandeira: str | None,
         valor: float,
         valor_taxa: float,
@@ -223,8 +237,8 @@ class Process:
 
         Se dias_comp for informado, o campo Dias Comp. também é atualizado.
         """
-        bandeira_cartao = str(bandeira).strip().upper() if bandeira else ''
-        forma_pagamento = f'{forma_pagto} {bandeira_cartao}'.strip()
+    
+        forma_pagamento = str(forma_pagamento).strip()
 
         # Filtrar forma pagamento
         filtrar_forma_pagto(

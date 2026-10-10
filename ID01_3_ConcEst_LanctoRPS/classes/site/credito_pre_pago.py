@@ -1,10 +1,14 @@
-"""Lançamento de RPS Consolidado para forma de pagamento 'Crédito pré-pago'."""
+"""Lançamento de RPS Consolidado para forma de pagamento 'Crédito pré-pago'.
+
+Fluxo:
+    1. Filtra a forma de pagamento (da fila) na tela RPS Consolidados.
+    2. Se a grade trouxer um RPS da empresa, atualiza o existente
+       (Ações > Editar).
+    3. Se não houver resultado, cria um NOVO lançamento.
+"""
 
 import logging
-import sqlite3
-from contextlib import closing
 from datetime import date, timedelta
-from pathlib import Path
 
 from selenium.common.exceptions import (
     StaleElementReferenceException,
@@ -16,22 +20,19 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+from ID01_3_ConcEst_LanctoRPS.classes.site.softcase import (
+    atualizar_dados,
+    editar_rps_consolidado,
+    filtrar_forma_pagto,
+)
+from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_forma_pagamento import (
+    AutocompleteSelecaoError,
+)
 from ID01_3_ConcEst_LanctoRPS.classes.utils.util_data import definir_data
 
 logger = logging.getLogger(__name__)
 
 TIMEOUT_PADRAO = 20
-PREFIXO_FORMA_PAGTO = "CRÉDITO"
-
-# As formas de pagamento válidas (inclusive variações de texto, como
-# 'Crédito Elo Cr?dito') vêm da tabela tbl_FormaDePagamento do banco.
-CAMINHO_BANCO_DADOS = Path(
-    r"C:\Armazenamento\ID01_2_ConcEst_TratarDados\Banco Dados\banco_dados.db"
-)
-SQL_FORMAS_PAGTO = (
-    'SELECT DISTINCT "Forma de Pagamento" FROM tbl_FormaDePagamento '
-    'WHERE "Forma de Pagamento" IS NOT NULL'
-)
 XPATH_ITENS_LISTA = (
     "//div[contains(@class,'mud-popover-open')]"
     "//div[contains(@class,'mud-list-item')]//p"
@@ -88,55 +89,6 @@ def _selecionar_empresa(driver: WebDriver, nome_empresa: str) -> None:
     opcao.click()
 
 
-def _formas_pagto_candidatas(
-    bandeira_cartao: str,
-    caminho_db: Path = CAMINHO_BANCO_DADOS,
-) -> list[str]:
-    """Retorna os textos aceitos para a forma de pagamento da bandeira.
-
-    Consulta a coluna "Forma de Pagamento" de tbl_FormaDePagamento e mantém
-    as formas que começam com 'CRÉDITO <bandeira>' (sem diferenciar
-    maiúsculas/minúsculas). O texto exato vem primeiro; as variações vêm
-    depois, das mais curtas para as mais longas.
-
-    A filtragem é feita em Python porque o LIKE do SQLite não ignora
-    maiúsculas/minúsculas em caracteres acentuados (ex.: 'É' x 'é').
-
-    Se o banco não puder ser lido ou nenhuma forma for encontrada, usa
-    o texto padrão 'CRÉDITO <bandeira>'.
-    """
-    padrao = f"{PREFIXO_FORMA_PAGTO} {bandeira_cartao}"
-    padrao_cf = padrao.casefold()
-
-    try:
-        # Somente leitura: esta consulta nunca altera o banco.
-        with closing(
-            sqlite3.connect(f"{caminho_db.as_uri()}?mode=ro", uri=True)
-        ) as conexao:
-            linhas = conexao.execute(SQL_FORMAS_PAGTO).fetchall()
-    except sqlite3.Error:
-        logger.exception(
-            "Falha ao ler tbl_FormaDePagamento em '%s'; usando '%s'.",
-            caminho_db,
-            padrao,
-        )
-        return [padrao]
-
-    formas: list[str] = []
-    for (forma,) in linhas:
-        texto = str(forma).strip()
-        if texto.casefold().startswith(padrao_cf) and texto not in formas:
-            formas.append(texto)
-
-    formas.sort(key=lambda f: (f.casefold() != padrao_cf, len(f)))
-    if not formas:
-        logger.warning("Nenhuma forma '%s' na tabela; usando o padrão.", padrao)
-        return [padrao]
-
-    logger.info("Formas de pagamento candidatas: %s", formas)
-    return formas
-
-
 def _selecionar_forma_pagto(driver: WebDriver, candidatas: list[str]) -> None:
     """Autocomplete: digita a 1ª candidata e clica no primeiro item que
     corresponda a alguma das candidatas (respeitando a ordem da lista).
@@ -170,35 +122,28 @@ def _selecionar_forma_pagto(driver: WebDriver, candidatas: list[str]) -> None:
     opcao.click()
 
 
-def lancar_credito_pre_pago(
+def _criar_novo_credito_pre_pago(
     driver: WebDriver,
     nome_empresa: str,
+    forma_pagto: str,
     valor: str,
     valor_taxa: str,
     dias_comp: str,
-    bandeira: str,
     data_lancamento: date | None = None,
 ) -> None:
-    """Cria um novo RPS Consolidado para 'Crédito pré-pago'.
+    """Cria um novo RPS Consolidado (botão NOVO) para 'Crédito pré-pago'.
 
     Args:
         driver: WebDriver já posicionado na tela RPS Consolidados.
         nome_empresa: Nome da empresa a selecionar.
+        forma_pagto: Texto da forma de pagamento a selecionar na lista
+            (vem da fila).
         valor: Valor do lançamento.
         valor_taxa: Valor para o campo Total taxa.
         dias_comp: Valor para o campo Dias Comp.
-        bandeira: Bandeira do cartão (ex.: 'Visa'); a forma de pagamento
-            selecionada será 'CRÉDITO ' + bandeira em maiúsculas.
         data_lancamento: Data do lançamento; padrão é D-1.
-
-    Raises:
-        ValueError: se a bandeira estiver vazia.
     """
-    bandeira_cartao = str(bandeira).strip().upper() if bandeira else ""
-    if not bandeira_cartao:
-        raise ValueError("Bandeira vazia: não é possível montar a forma de pagamento.")
-    formas_pagto = _formas_pagto_candidatas(bandeira_cartao)  # ex.: CRÉDITO VISA
-
+    formas_pagto = [forma_pagto.strip()]  # vem da fila
     data = data_lancamento or (date.today() - timedelta(days=1))
     data_str = f"{data.day}/{data.month}/{data.year}"  # formato 'd/m/aaaa'
 
@@ -238,3 +183,94 @@ def lancar_credito_pre_pago(
         raise
 
     logger.info("Lançamento Crédito pré-pago salvo: %s", nome_empresa)
+
+
+def _existe_rps_na_grade(
+    driver: WebDriver, nome_empresa: str, timeout: int = 5
+) -> bool:
+    """Retorna True se a grade tem uma linha cuja coluna Empresa contém o
+    nome da empresa (ex.: 'BETIM (NEPOS) (30296394000561)').
+    """
+    xpath = (
+        "//td[@data-label='Empresa']"
+        f"[contains(normalize-space(.), \"{nome_empresa.strip()}\")]"
+    )
+    try:
+        WebDriverWait(driver, timeout).until(
+            EC.presence_of_element_located((By.XPATH, xpath))
+        )
+    except TimeoutException:
+        return False
+    return True
+
+
+def lancar_credito_pre_pago(
+    driver: WebDriver,
+    nome_empresa: str,
+    forma_pagto: str,
+    valor: str,
+    valor_taxa: str,
+    dias_comp: str,
+    data_lancamento: date | None = None,
+) -> None:
+    """Atualiza o RPS de 'Crédito pré-pago' existente ou cria um NOVO.
+
+    Primeiro filtra a forma de pagamento na tela de pesquisa. Se a grade
+    trouxer o RPS da empresa, clica em Ações > Editar e atualiza Valor,
+    Total taxa e Dias Comp.; caso contrário, clica em NOVO.
+
+    Args:
+        driver: WebDriver já posicionado na tela RPS Consolidados, com a
+            empresa e as datas pesquisadas.
+        nome_empresa: Nome da empresa (confere a coluna Empresa da grade
+            e é selecionada no NOVO).
+        forma_pagto: Forma de pagamento vinda da fila.
+        valor: Valor do lançamento.
+        valor_taxa: Valor para o campo Total taxa.
+        dias_comp: Valor para o campo Dias Comp.
+        data_lancamento: Data do NOVO; padrão é D-1.
+    """
+    if not forma_pagto or not str(forma_pagto).strip():
+        raise ValueError("Forma de pagamento vazia.")
+    forma_pagto = str(forma_pagto).strip()
+
+    try:
+        filtrar_forma_pagto(
+            driver=driver,
+            forma_pgto=forma_pagto,
+            bandeira=None,
+        )
+        existe = _existe_rps_na_grade(driver, nome_empresa)
+    except AutocompleteSelecaoError:
+        existe = False  # grade vazia para essa forma de pagamento
+
+    if not existe:
+        logger.info(
+            "Nenhum RPS '%s' para '%s'; criando NOVO lançamento.",
+            forma_pagto,
+            nome_empresa,
+        )
+        _criar_novo_credito_pre_pago(
+            driver,
+            nome_empresa,
+            forma_pagto,
+            valor,
+            valor_taxa,
+            dias_comp,
+            data_lancamento,
+        )
+        return
+
+    logger.info(
+        "RPS '%s' encontrado para '%s'; atualizando (Ações > Editar).",
+        forma_pagto,
+        nome_empresa,
+    )
+    atualizar_dados(driver=driver)
+    editar_rps_consolidado(
+        driver=driver,
+        valor=valor,
+        total_taxa=valor_taxa,
+        dias_comp=dias_comp,
+    )
+    logger.info("Lançamento Crédito pré-pago atualizado: %s", nome_empresa)

@@ -77,8 +77,7 @@ class InitAllApplications:
                 fazer_login_softcase(driver=cls.web_driver)
                 
                 #Download do relatorio antes dos lançamentos
-                #download_relatorio_softcase(driver=cls.web_driver)
-
+                download_relatorio_softcase(driver=cls.web_driver)
 
             except BusinessRuleException as err:
                 raise err

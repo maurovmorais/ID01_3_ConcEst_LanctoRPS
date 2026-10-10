@@ -1,23 +1,19 @@
 """Lançamento de RPS Consolidado para 'Crédito conversor de moedas'.
 
-Cria um novo lançamento pelo botão NOVO (diálogo 'Criar RPS Consolidado').
+Fluxo:
+    1. Filtra a forma de pagamento (da fila) na tela RPS Consolidados.
+    2. Se a grade trouxer um RPS da empresa, atualiza o existente
+       (Ações > Editar).
+    3. Se não houver resultado, cria um NOVO lançamento pelo botão NOVO
+       (diálogo 'Criar RPS Consolidado').
 
-Regra da forma de pagamento:
-1. Lê a origem entre parênteses no nome da empresa (variável softcase),
-   ex.: 'BETIM (NEPOS)' -> 'NEPOS'.
-2. Na tabela tbl_FormaDePagamento do banco de dados, filtra
-   Origem = <origem> e Tipo = 'CONVERSOR DE MOEDAS' e retorna a coluna
-   'Forma de Pagamento' (ex.: 'Digital Wallet').
+A forma de pagamento vem da fila (variável ``forma_pagamento`` do Process).
 
-Módulo autônomo: tem os próprios seletores e funções auxiliares.
+A criação (NOVO) usa seletores e funções auxiliares próprios.
 """
 
 import logging
-import re
-import sqlite3
-from contextlib import closing
 from datetime import date, timedelta
-from pathlib import Path
 
 from selenium.common.exceptions import (
     StaleElementReferenceException,
@@ -29,21 +25,21 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+from ID01_3_ConcEst_LanctoRPS.classes.site.softcase import (
+    atualizar_dados,
+    editar_rps_consolidado,
+    filtrar_forma_pagto,
+)
+from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_forma_pagamento import (
+    AutocompleteSelecaoError,
+)
 from ID01_3_ConcEst_LanctoRPS.classes.utils.util_data import definir_data
 
 logger = logging.getLogger(__name__)
 
 TIMEOUT_PADRAO = 20
-TIPO_FORMA_PAGTO = "CONVERSOR DE MOEDAS"
 QUANTIDADE_FIXA = "1"
 DIAS_COMP_PADRAO = "0"
-
-CAMINHO_BANCO_DADOS = Path(
-    r"C:\Armazenamento\ID01_2_ConcEst_TratarDados\Banco Dados\banco_dados.db"
-)
-SQL_FORMAS_PAGTO = (
-    'SELECT "Origem", "Tipo", "Forma de Pagamento" FROM tbl_FormaDePagamento'
-)
 
 XPATH_BOTAO_NOVO = (
     "/html/body/div[1]/div/div[3]/div[2]/div/div[5]/div[1]/div[1]/button[1]"
@@ -99,77 +95,6 @@ def _selecionar_empresa(driver: WebDriver, nome_empresa: str) -> None:
     opcao.click()
 
 
-def _extrair_origem(nome_empresa: str) -> str:
-    """Retorna o texto entre parênteses do nome da empresa.
-
-    Ex.: 'BETIM (NEPOS)' -> 'NEPOS'. Havendo mais de um par de parênteses,
-    usa o último.
-
-    Raises:
-        ValueError: se não houver texto entre parênteses.
-    """
-    trechos = [
-        t.strip()
-        for t in re.findall(r"\(([^()]*)\)", str(nome_empresa or ""))
-        if t.strip()
-    ]
-    if not trechos:
-        raise ValueError(
-            f"Origem não encontrada entre parênteses em '{nome_empresa}'."
-        )
-    return trechos[-1]
-
-
-def _formas_pagto_candidatas(
-    origem: str,
-    caminho_db: Path = CAMINHO_BANCO_DADOS,
-) -> list[str]:
-    """Retorna as formas de pagamento da origem para CONVERSOR DE MOEDAS.
-
-    Filtra tbl_FormaDePagamento por Origem = <origem> e
-    Tipo = 'CONVERSOR DE MOEDAS' (sem diferenciar maiúsculas/minúsculas)
-    e devolve a coluna "Forma de Pagamento", sem repetições.
-
-    Raises:
-        sqlite3.Error: se o banco não puder ser lido.
-        ValueError: se nenhuma forma for encontrada para a origem.
-    """
-    origem_cf = origem.strip().casefold()
-    tipo_cf = TIPO_FORMA_PAGTO.casefold()
-
-    try:
-        # Somente leitura: esta consulta nunca altera o banco.
-        with closing(
-            sqlite3.connect(f"{caminho_db.as_uri()}?mode=ro", uri=True)
-        ) as conexao:
-            linhas = conexao.execute(SQL_FORMAS_PAGTO).fetchall()
-    except sqlite3.Error:
-        logger.exception(
-            "Falha ao ler tbl_FormaDePagamento em '%s'.", caminho_db
-        )
-        raise
-
-    formas: list[str] = []
-    for linha_origem, linha_tipo, forma in linhas:
-        if forma is None:
-            continue
-        if (
-            str(linha_origem).strip().casefold() == origem_cf
-            and str(linha_tipo).strip().casefold() == tipo_cf
-            and str(forma).strip() not in formas
-        ):
-            formas.append(str(forma).strip())
-
-    if not formas:
-        raise ValueError(
-            "Nenhuma forma de pagamento em tbl_FormaDePagamento para "
-            f"Origem='{origem}' e Tipo='{TIPO_FORMA_PAGTO}'."
-        )
-
-    logger.info("Formas de pagamento para %s: %s", origem, formas)
-    return formas
-
-
 def _selecionar_forma_pagto(driver: WebDriver, candidatas: list[str]) -> None:
     """Autocomplete: digita a 1ª candidata e clica no primeiro item que
     corresponda a alguma das candidatas (respeitando a ordem da lista).
@@ -210,33 +135,30 @@ def _normalizar_dias_comp(dias_comp: str | int | None) -> str:
     return str(dias_comp).strip()
 
 
-def lancar_credito_conversor_moedas(
+def _criar_novo_conversor_moedas(
     driver: WebDriver,
     nome_empresa: str,
+    forma_pagto: str,
     valor: str,
     valor_taxa: str,
     dias_comp: str | int | None = None,
     data_lancamento: date | None = None,
 ) -> None:
-    """Cria um novo RPS Consolidado para 'Crédito conversor de moedas'.
+    """Cria um novo RPS Consolidado (botão NOVO) para 'Crédito conversor
+    de moedas'.
 
     Args:
         driver: WebDriver já posicionado na tela RPS Consolidados.
-        nome_empresa: Nome da empresa (variável softcase), com a origem
-            entre parênteses, ex.: 'BETIM (NEPOS)'.
+        nome_empresa: Nome da empresa a selecionar.
+        forma_pagto: Texto da forma de pagamento a selecionar na lista
+            (vem da fila).
         valor: Valor do lançamento.
         valor_taxa: Valor para o campo Total taxa.
         dias_comp: Valor para o campo Dias Comp.; se vier None/vazio,
             usa '0'.
         data_lancamento: Data do lançamento; padrão é D-1.
-
-    Raises:
-        ValueError: se o nome da empresa não tiver origem entre parênteses
-            ou se a tabela não tiver forma de pagamento para a origem.
     """
-    # Resolve a forma de pagamento antes de abrir o diálogo.
-    origem = _extrair_origem(nome_empresa)
-    formas_pagto = _formas_pagto_candidatas(origem)
+    formas_pagto = [forma_pagto.strip()]  # vem da fila
     dias_comp_texto = _normalizar_dias_comp(dias_comp)
 
     data = data_lancamento or (date.today() - timedelta(days=1))
@@ -278,3 +200,100 @@ def lancar_credito_conversor_moedas(
         raise
 
     logger.info("Lançamento Crédito conversor de moedas salvo: %s", nome_empresa)
+
+
+def _existe_rps_na_grade(
+    driver: WebDriver, nome_empresa: str, timeout: int = 5
+) -> bool:
+    """Retorna True se a grade tem uma linha cuja coluna Empresa contém o
+    nome da empresa (ex.: 'BETIM (NEPOS) (30296394000561)').
+    """
+    xpath = (
+        "//td[@data-label='Empresa']"
+        f"[contains(normalize-space(.), \"{nome_empresa.strip()}\")]"
+    )
+    try:
+        WebDriverWait(driver, timeout).until(
+            EC.presence_of_element_located((By.XPATH, xpath))
+        )
+    except TimeoutException:
+        return False
+    return True
+
+
+def lancar_credito_conversor_moedas(
+    driver: WebDriver,
+    nome_empresa: str,
+    forma_pagto: str,
+    valor: str,
+    valor_taxa: str,
+    dias_comp: str | int | None = None,
+    data_lancamento: date | None = None,
+) -> None:
+    """Atualiza o RPS de 'Crédito conversor de moedas' ou cria um NOVO.
+
+    Primeiro filtra a forma de pagamento na tela de pesquisa. Se a grade
+    trouxer o RPS da empresa, clica em Ações > Editar e atualiza Valor,
+    Total taxa e Dias Comp.; caso contrário, clica em NOVO.
+
+    Args:
+        driver: WebDriver já posicionado na tela RPS Consolidados, com a
+            empresa e as datas pesquisadas.
+        nome_empresa: Nome da empresa (confere a coluna Empresa da grade
+            e é selecionada no NOVO).
+        forma_pagto: Forma de pagamento vinda da fila.
+        valor: Valor do lançamento.
+        valor_taxa: Valor para o campo Total taxa.
+        dias_comp: Valor para o campo Dias Comp.; no NOVO, None/vazio
+            vira '0'; na edição, None mantém o valor atual do portal.
+        data_lancamento: Data do NOVO; padrão é D-1.
+
+    Raises:
+        ValueError: se o texto da forma de pagamento estiver vazio.
+    """
+    if not forma_pagto or not str(forma_pagto).strip():
+        raise ValueError("Forma de pagamento vazia.")
+    forma_pagto = str(forma_pagto).strip()
+
+    try:
+        filtrar_forma_pagto(
+            driver=driver,
+            forma_pgto=forma_pagto,
+            bandeira=None,
+        )
+        existe = _existe_rps_na_grade(driver, nome_empresa)
+    except AutocompleteSelecaoError:
+        existe = False  # grade vazia para essa forma de pagamento
+
+    if not existe:
+        logger.info(
+            "Nenhum RPS '%s' para '%s'; criando NOVO lançamento.",
+            forma_pagto,
+            nome_empresa,
+        )
+        _criar_novo_conversor_moedas(
+            driver,
+            nome_empresa,
+            forma_pagto,
+            valor,
+            valor_taxa,
+            dias_comp,
+            data_lancamento,
+        )
+        return
+
+    logger.info(
+        "RPS '%s' encontrado para '%s'; atualizando (Ações > Editar).",
+        forma_pagto,
+        nome_empresa,
+    )
+    atualizar_dados(driver=driver)
+    editar_rps_consolidado(
+        driver=driver,
+        valor=valor,
+        total_taxa=valor_taxa,
+        dias_comp=dias_comp,
+    )
+    logger.info(
+        "Lançamento Crédito conversor de moedas atualizado: %s", nome_empresa
+    )

@@ -137,6 +137,7 @@ def _normalizar_dias_comp(dias_comp: str | int | None) -> str:
 def _criar_novo_dinheiro(
     driver: WebDriver,
     nome_empresa: str,
+    forma_pagamento: str,
     valor: str,
     valor_taxa: str,
     dias_comp: str | int | None,
@@ -164,7 +165,7 @@ def _criar_novo_dinheiro(
     # Campo Data é readonly: usa o seletor de calendário já existente.
     definir_data(driver, XPATH_BOTAO_CALENDARIO_DATA, data_str)
 
-    _selecionar_forma_pagto(driver, FORMA_PAGTO_DINHEIRO)
+    _selecionar_forma_pagto(driver, forma_pagamento)
     _preencher(driver, XPATH_VALOR, valor)
     _preencher(driver, XPATH_QUANTIDADE, QUANTIDADE_FIXA)
     _preencher(driver, XPATH_TOTAL_TAXA, valor_taxa)
@@ -189,6 +190,7 @@ def _criar_novo_dinheiro(
 def lancar_dinheiro(
     driver: WebDriver,
     nome_empresa: str,
+    forma_pagamento: str,
     valor: str,
     valor_taxa: str,
     dias_comp: str | int | None = None,
@@ -199,24 +201,36 @@ def lancar_dinheiro(
     Args:
         driver: WebDriver já posicionado na tela RPS Consolidados.
         nome_empresa: Nome da empresa a selecionar (só no NOVO).
+        forma_pagamento: Forma de pagamento vinda da fila (usada no
+            filtro e no NOVO).
         valor: Valor do lançamento.
         valor_taxa: Valor para o campo Total taxa.
         dias_comp: Valor de Dias Comp. vindo da fila.
         data_lancamento: Data do NOVO; padrão é D-1.
     """
+    if not forma_pagamento or not str(forma_pagamento).strip():
+        raise ValueError("Forma de pagamento vazia.")
+    forma_pagamento = str(forma_pagamento).strip()
+
     try:
         filtrar_forma_pagto(
             driver=driver,
-            forma_pgto=FORMA_PAGTO_DINHEIRO,
+            forma_pgto=forma_pagamento,
             bandeira=None,
         )
     except AutocompleteSelecaoError:
         logger.info(
             "Nenhum RPS '%s' para alterar; criando NOVO lançamento.",
-            FORMA_PAGTO_DINHEIRO,
+            forma_pagamento,
         )
         _criar_novo_dinheiro(
-            driver, nome_empresa, valor, valor_taxa, dias_comp, data_lancamento
+            driver,
+            nome_empresa,
+            forma_pagamento,
+            valor,
+            valor_taxa,
+            dias_comp,
+            data_lancamento,
         )
         return
 

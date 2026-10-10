@@ -93,10 +93,25 @@ def _limpar_campo(
     timeout: int = 5,
 ) -> None:
     """Esvazia o autocomplete e confirma que o valor ficou vazio."""
+    # campo = WebDriverWait(driver, timeout).until(
+    #     EC.element_to_be_clickable((By.XPATH, xpath_campo_input))
+    # )
+    # campo.click()
     campo = WebDriverWait(driver, timeout).until(
-        EC.element_to_be_clickable((By.XPATH, xpath_campo_input))
+    EC.element_to_be_clickable((By.XPATH, xpath_campo_input))
     )
-    campo.click()
+    # Centraliza o campo na tela: evita que fique escondido sob a barra
+    # superior fixa (mud-toolbar-appbar) após a rolagem da página.
+    driver.execute_script(
+        "arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});",
+        campo,
+    )
+    time.sleep(0.3)  # deixa a rolagem terminar
+    try:
+        campo.click()
+    except ElementClickInterceptedException:
+        logger.warning("Clique interceptado no campo; usando foco via JavaScript.")
+        driver.execute_script("arguments[0].focus(); arguments[0].click();", campo)
     campo.send_keys(Keys.CONTROL, "a")
     campo.send_keys(Keys.DELETE)
 
