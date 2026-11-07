@@ -93,11 +93,11 @@ def _validar_colunas_obrigatorias(
         for coluna in COLUNAS_OBRIGATORIAS
         if _normalizar_rotulo(coluna) not in rotulos_encontrados
     ]
-    if faltando:
-        raise RemocaoLinhasVaziasError(
-            "Coluna(s) obrigatória(s) não encontrada(s) na tabela: "
-            f"{', '.join(faltando)}."
-        )
+    # if faltando:
+    #     raise RemocaoLinhasVaziasError(
+    #         "Coluna(s) obrigatória(s) não encontrada(s) na tabela: "
+    #         f"{', '.join(faltando)}."
+    #     )
 
 
 class RemocaoLinhasVaziasError(Exception):

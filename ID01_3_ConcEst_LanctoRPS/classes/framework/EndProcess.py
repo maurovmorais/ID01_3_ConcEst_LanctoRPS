@@ -12,6 +12,9 @@ from ID01_3_ConcEst_LanctoRPS.classes.dados_execucao.DadosExecucao import DadosE
 from ID01_3_ConcEst_LanctoRPS.classes.relatorios.Relatorios import Relatorios
 from ID01_3_ConcEst_LanctoRPS.classes.email.send.SendEmail import SendEmail
 from ID01_3_ConcEst_LanctoRPS.classes.email.send.SendEmailOutlook import SendEmailOutlook
+from ID01_3_ConcEst_LanctoRPS.classes.relatorios.relatorio_dados_fila import RelatorioDadosFila
+from ID01_3_ConcEst_LanctoRPS.classes.framework.InitAllSettings import Browser
+from ID01_3_ConcEst_LanctoRPS.classes.site.softcase import fazer_login_softcase,download_relatorio_softcase
 
 
 
@@ -69,7 +72,22 @@ class EndProcess:
         caminho_relatorio_analitico = Relatorios.preencher_analitico()
         caminho_relatorio_sintetico = Relatorios.preencher_sintetico()
 
-        # TODO : Criar codigo para download apos alteração
+        
+        #Gera realtorio da fila processada
+        RelatorioDadosFila().gerar()
+
+        #Gera relatorio apos alteracao
+        try:
+            caminho_download = InitAllSettings.config['relatorio_rps_depois']
+            #Login site Softcase
+            InitAllSettings.initiate_web_manipulator(headless=False, browser_escolhido=Browser.CHROME,pasta_download=caminho_download)
+            cls.web_driver = InitAllSettings.web_driver
+            fazer_login_softcase(driver=cls.web_driver)
+
+            #Download do relatorio antes dos lançamentos
+            download_relatorio_softcase(driver=cls.web_driver)
+        except:
+            Log.write_log("Falha ao salvar relatorio após alteração.")
 
 
         #Enviando email final com os relatórios analítico e sintético

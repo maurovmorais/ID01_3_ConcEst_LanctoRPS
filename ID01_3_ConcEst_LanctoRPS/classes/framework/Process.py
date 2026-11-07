@@ -25,6 +25,7 @@ from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_remover_linha_debito import 
 from ID01_3_ConcEst_LanctoRPS.classes.site.softcase_remover_linha_vazia import remover_linhas_com_celula_vazia
 from ID01_3_ConcEst_LanctoRPS.classes.utils.remover_linhas_duplicadas import remover_linhas_duplicadas
 from ID01_3_ConcEst_LanctoRPS.classes.utils.excluir_linhas_softcase import criar_excluir_linha
+from ID01_3_ConcEst_LanctoRPS.classes.utils.dados_fila import DadosFila
 
 # Imports dos pacotes externos
 from time import sleep
@@ -74,6 +75,7 @@ class Process:
         cls.web_driver = InitAllSettings.web_driver
 
         dado = GetTransaction.queue_item['info_adicionais'][0]
+        DadosFila().inserir_item(dado, id_item_fila=GetTransaction.queue_item['id'])
         referencia = GetTransaction.queue_item['referencia']
         adquirente = dado['adquirente']
         nome_empresa = dado['softcase']
