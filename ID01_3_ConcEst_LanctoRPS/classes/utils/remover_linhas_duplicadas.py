@@ -30,7 +30,7 @@ LIMIAR_SIMILARIDADE = 0.90
 COL_FORMA_PAGAMENTO = "Forma de pagamento"
 COL_DIAS_COMP = "Dias Comp."
 COL_NUMERO = "Numero"
-
+FORMA_DINHEIRO = "DINHEIRO"
 Linha = dict[str, str | int]
 
 
@@ -115,6 +115,68 @@ def extrair_linhas(html: str) -> list[Linha]:
     return linhas
 
 
+# def remover_linhas_duplicadas(
+#     html: str,
+#     limiar: float = LIMIAR_SIMILARIDADE,
+#     excluir: Callable[[Linha], None] | None = None,
+# ) -> ResultadoDuplicidade:
+#     """Identifica e remove linhas duplicadas, mantendo só uma por grupo.
+
+#     Duplicada = mesmo "Dias Comp." e "Forma de pagamento" com similaridade
+#     >= ``limiar``. A primeira linha do grupo (ordem da tabela) é mantida.
+
+#     Args:
+#         html: HTML contendo a tabela.
+#         limiar: Similaridade mínima (0 a 1) da forma de pagamento.
+#         excluir: Função chamada para cada linha duplicada (ex.: clicar em
+#             Ações > Excluir no portal, localizando a linha pelo "Numero").
+#             Se ``None``, nada é excluído (apenas simulação).
+
+#     Returns:
+#         ResultadoDuplicidade com as linhas mantidas e as removidas.
+#     """
+#     linhas = extrair_linhas(html)
+#     grupos: list[dict] = []
+
+#     for linha in linhas:
+#         dias = _normalizar_dias(str(linha[COL_DIAS_COMP]))
+#         forma = normalizar_texto(str(linha[COL_FORMA_PAGAMENTO]))
+
+#         grupo_encontrado = None
+#         for grupo in grupos:
+#             if grupo["dias"] != dias:
+#                 continue
+#             if calcular_similaridade(grupo["forma"], forma) >= limiar:
+#                 grupo_encontrado = grupo
+#                 break
+
+#         if grupo_encontrado is None:
+#             grupos.append({"dias": dias, "forma": forma, "linhas": [linha]})
+#         else:
+#             grupo_encontrado["linhas"].append(linha)
+
+#     resultado = ResultadoDuplicidade()
+#     for grupo in grupos:
+#         mantida, *duplicadas = grupo["linhas"]
+#         resultado.mantidas.append(mantida)
+#         if not duplicadas:
+#             continue
+#         resultado.removidas.extend(duplicadas)
+#         resultado.grupos.append(grupo["linhas"])
+#         logger.info(
+#             "Mantida %s; duplicadas: %s",
+#             mantida.get(COL_NUMERO),
+#             [d.get(COL_NUMERO) for d in duplicadas],
+#         )
+
+#     if excluir is not None:
+#         for linha in resultado.removidas:
+#             excluir(linha)
+
+#     return resultado
+
+
+
 def remover_linhas_duplicadas(
     html: str,
     limiar: float = LIMIAR_SIMILARIDADE,
@@ -124,6 +186,8 @@ def remover_linhas_duplicadas(
 
     Duplicada = mesmo "Dias Comp." e "Forma de pagamento" com similaridade
     >= ``limiar``. A primeira linha do grupo (ordem da tabela) é mantida.
+    Linhas cuja forma de pagamento é DINHEIRO nunca são consideradas
+    duplicadas: todas são mantidas e passam direto.
 
     Args:
         html: HTML contendo a tabela.
@@ -136,22 +200,35 @@ def remover_linhas_duplicadas(
         ResultadoDuplicidade com as linhas mantidas e as removidas.
     """
     linhas = extrair_linhas(html)
+    forma_dinheiro = normalizar_texto(FORMA_DINHEIRO)
     grupos: list[dict] = []
 
     for linha in linhas:
         dias = _normalizar_dias(str(linha[COL_DIAS_COMP]))
         forma = normalizar_texto(str(linha[COL_FORMA_PAGAMENTO]))
+        is_dinheiro = forma == forma_dinheiro
+
+        # DINHEIRO nunca agrupa: vira grupo próprio e segue sem exclusão.
+        if is_dinheiro:
+            grupos.append(
+                {"dias": dias, "forma": forma, "linhas": [linha],
+                 "is_dinheiro": True}
+            )
+            continue
 
         grupo_encontrado = None
         for grupo in grupos:
-            if grupo["dias"] != dias:
+            if grupo["is_dinheiro"] or grupo["dias"] != dias:
                 continue
             if calcular_similaridade(grupo["forma"], forma) >= limiar:
                 grupo_encontrado = grupo
                 break
 
         if grupo_encontrado is None:
-            grupos.append({"dias": dias, "forma": forma, "linhas": [linha]})
+            grupos.append(
+                {"dias": dias, "forma": forma, "linhas": [linha],
+                 "is_dinheiro": False}
+            )
         else:
             grupo_encontrado["linhas"].append(linha)
 
@@ -174,15 +251,3 @@ def remover_linhas_duplicadas(
             excluir(linha)
 
     return resultado
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    caminho = Path(sys.argv[1])
-    res = remover_linhas_duplicadas(caminho.read_text(encoding="utf-8"))
-    print(f"Mantidas: {len(res.mantidas)} | Removidas: {len(res.removidas)}")
-    for dup in res.removidas:
-        print(
-            f"  remover Numero={dup.get(COL_NUMERO)} | "
-            f"{dup[COL_FORMA_PAGAMENTO]} | Dias Comp.={dup[COL_DIAS_COMP]}"
-        )

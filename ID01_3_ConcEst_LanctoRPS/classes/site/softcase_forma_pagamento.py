@@ -153,13 +153,28 @@ def digitar_busca(
         ) from exc
 
 
+# def _listar_itens_por_texto(
+#     driver: WebDriver,
+#     texto_item_alvo: str,
+# ) -> list[WebElement]:
+#     """Retorna todos os itens da lista cujo texto bate com `texto_item_alvo`."""
+#     itens = driver.find_elements(By.CSS_SELECTOR, CSS_ITENS_LISTA)
+#     return [item for item in itens if item.text.strip() == texto_item_alvo]
+
 def _listar_itens_por_texto(
     driver: WebDriver,
     texto_item_alvo: str,
 ) -> list[WebElement]:
-    """Retorna todos os itens da lista cujo texto bate com `texto_item_alvo`."""
+    """Retorna os itens da lista cujo texto bate com `texto_item_alvo`.
+
+    A comparação ignora maiúsculas/minúsculas e espaços extras, pois o
+    MudBlazor pode exibir o item em caixa diferente da digitada
+    (ex.: digitado 'Greenpass', exibido 'GREENPASS').
+    """
+    alvo = _normalizar_texto(texto_item_alvo)
     itens = driver.find_elements(By.CSS_SELECTOR, CSS_ITENS_LISTA)
-    return [item for item in itens if item.text.strip() == texto_item_alvo]
+    return [item for item in itens if _normalizar_texto(item.text) == alvo]
+
 
 
 def _clicar_ocorrencia(

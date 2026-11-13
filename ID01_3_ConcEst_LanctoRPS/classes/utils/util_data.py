@@ -38,6 +38,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 logger = logging.getLogger(__name__)
 from pathlib import Path
 import time
+import sqlite3
+from contextlib import closing
 
 TIMEOUT_PADRAO = 10
 
@@ -55,6 +57,26 @@ MESES_PT: dict[int, str] = {
     11: "novembro",
     12: "dezembro",
 }
+
+
+
+DIAS_SEMANA: tuple[str, ...] = (
+    "SEGUNDA",
+    "TERÇA",
+    "QUARTA",
+    "QUINTA",
+    "SEXTA",
+    "SABADO",
+    "DOMINGO",
+)
+
+"""Consulta de "Dias Comp. Dinheiro" na tabela tbl_Dinheiro."""
+
+CAMINHO_BANCO = Path(
+    r"C:\Armazenamento\ID01_2_ConcEst_TratarDados"
+    r"\Banco Dados\banco_dados.db"
+)
+
 
 CSS_CONTAINER_CALENDARIO = "div.mud-picker-calendar-container"
 CSS_BOTAO_MES_ATUAL = "button.mud-button-month"
@@ -274,4 +296,67 @@ def obter_intervalo_ontem():
     
     # Retorna o intervalo repetido
     return f"{ontem_formatado}"
+
+
+def obter_dia_semana(data_texto: str) -> str:
+    """Retorna o dia da semana de uma data no formato dd/mm/aaaa.
+
+    Args:
+        data_texto: Data no padrão "11/11/2026".
+
+    Returns:
+        Dia da semana em maiúsculas (SEGUNDA, TERÇA, ..., DOMINGO).
+
+    Raises:
+        ValueError: Se a data estiver fora do padrão dd/mm/aaaa ou for inválida.
+    """
+    data = datetime.strptime(data_texto.strip(), "%d/%m/%Y")
+    return DIAS_SEMANA[data.weekday()]
+
+
+def obter_dias_comp_dinheiro(
+    dia_semana: str,
+    caminho_banco: Path = CAMINHO_BANCO,
+):
+    """Retorna "Dias Comp. Dinheiro" para o "Dia da Semana" informado.
+
+    Args:
+        dia_semana: Dia da semana como gravado na tabela (ex.: 'QUINTA').
+            Espaços extras são removidos e o texto é convertido para
+            maiúsculas.
+        caminho_banco: Caminho do arquivo SQLite.
+
+    Returns:
+        O valor de "Dias Comp. Dinheiro" ou None se o dia não existir.
+
+    Raises:
+        ValueError: Se dia_semana estiver vazio.
+        FileNotFoundError: Se o arquivo do banco não existir.
+        sqlite3.Error: Em caso de falha na consulta.
+    """
+    dia_normalizado = (dia_semana or "").strip().upper()
+    if not dia_normalizado:
+        raise ValueError("O parâmetro 'dia_semana' não pode ser vazio.")
+
+    if not Path(caminho_banco).is_file():
+        raise FileNotFoundError(f"Banco não encontrado: {caminho_banco}")
+
+    query = (
+        'SELECT "Dias Comp. Dinheiro" '
+        "FROM tbl_Dinheiro "
+        'WHERE "Dia da Semana" = ?'
+    )
+
+    try:
+        with closing(sqlite3.connect(caminho_banco)) as conexao:
+            linha = conexao.execute(query, (dia_normalizado,)).fetchone()
+    except sqlite3.Error:
+        logger.exception("Erro ao consultar tbl_Dinheiro (%s)", dia_normalizado)
+        raise
+
+    if linha is None:
+        logger.warning("Dia da Semana não encontrado: %s", dia_normalizado)
+        return None
+
+    return linha[0]
 

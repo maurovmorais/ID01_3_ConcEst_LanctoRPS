@@ -34,6 +34,7 @@ from ID01_3_ConcEst_LanctoRPS.classes.utils.remover_linhas_duplicadas import rem
 from ID01_3_ConcEst_LanctoRPS.classes.utils.excluir_linhas_softcase import criar_excluir_linha
 
 
+
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -53,7 +54,7 @@ XPATH_PAINEL_DROPDOWN = ("/html/body/div[1]/div/div[3]/div[2]/div/div[4]/div[2]/
 
 #Tempos e dalays
 TIMEOUT_PADRAO_SEGUNDOS = 60
-TIMEOUT_PADRAO = 15
+TIMEOUT_PADRAO = 20
 TENTATIVAS_MAXIMAS = 3
 ESPERA_ENTRE_TENTATIVAS_SEGUNDOS = 3
 
@@ -67,6 +68,34 @@ XPATH_BTN_ATUALIZAR = (
     f"{XPATH_DIALOGO}//button[@type='submit']"
     "[normalize-space(.)='Atualizar']"
 )
+
+"""Tratamento do campo Dias Comp. das linhas DINHEIRO (RPS Consolidados)."""
+FORMA_PAGAMENTO_ALVO = "DINHEIRO"
+
+XPATH_POPOVER_ABERTO = "//div[contains(@class,'mud-popover-open')]"
+XPATH_MENU_EDITAR = (
+    f"{XPATH_POPOVER_ABERTO}"
+    "//*[contains(@class,'mud-list-item') or contains(@class,'mud-menu-item')]"
+    "[contains(normalize-space(.),'Editar')]"
+)
+XPATH_LINHAS = "//table[contains(@class,'mud-table-root')]/tbody/tr"
+XPATH_BOTAO_ACOES = ".//td[1]/div/button"
+# Fallback caso o índice div[29] do popover mude entre execuções
+XPATH_MENU_EDITAR_TEXTO = (
+    "//div[contains(@class,'mud-popover-open')]"
+    "//div[contains(@class,'mud-menu-item')][normalize-space()='Editar']"
+)
+XPATH_DIALOGO = "//div[@role='dialog' and contains(@class,'mud-dialog')]"
+XPATH_CAMPO_DIAS_COMP = (
+    "/html/body/div[1]/div/div[1]/div[2]/form/div/div[4]/div[1]"
+    "/div/div[20]/div/div/div/input"
+)
+XPATH_BOTAO_ATUALIZAR = (
+    "/html/body/div[1]/div/div[1]/div[2]/form/div/div[4]/div[2]/button[2]"
+)
+
+class AutocompleteSelecaoError(Exception):
+    """Erro genérico ao interagir com um campo autocomplete MudBlazor."""
 
 
 def fazer_login_softcase(
@@ -208,46 +237,41 @@ def pesquisar_empresa(driver: WebDriver,empresa:str) -> None:
         raise
 
 
-def filtrar_forma_pagto(driver: WebDriver,forma_pgto:str, bandeira:str) -> None:
+def filtrar_forma_pagto(
+    driver: WebDriver,
+    forma_pgto: str,
+    bandeira: str | None,
+) -> None:
+    """Filtra a forma de pagamento na tela de pesquisa.
 
+    Raises:
+        AutocompleteSelecaoError: se nenhuma ocorrência retornar dados
+            (o chamador decide se cria um NOVO).
+    """
     try:
-       
-        #Leitura da Tabela de dados
-        tabela_xpath = '//*[@id="app"]/div/div[3]/div[2]/div/div[5]/div[3]/table/tbody'
+        xpath_campo_forma_pagamento = (
+            '/html/body/div[1]/div/div[3]/div[2]/div/div[4]/div[2]/div/div'
+            '/div/div[2]/div/div[7]/div/div/div/div[1]/input'
+        )
+        botao_pesquisar = (
+            '//*[@id="app"]/div/div[3]/div[2]/div/div[4]/div[2]/div/div'
+            '/div/div[2]/div/div[8]/button[2]'
+        )
 
-        # #Excluir linhas com colunas em branco.
-        # time.sleep(3)
-        # remover_linhas_com_celula_vazia(driver)
-
-        # #Remover linhas Duplicadas
-        # #excluir = criar_excluir_linha(driver)
-        # #resultado = remover_linhas_duplicadas(driver.page_source, excluir=excluir)
-        # resultado = remover_linhas_duplicadas(driver.page_source)
-
-        # Log.write_log(
-        #     f"Duplicadas encontradas: {len(resultado.removidas)} "
-        #     f"({[d['Numero'] for d in resultado.removidas]})"
-        # )
-
-        #Campo Forma de Pagamento
-        xpath_campo_forma_pagamento = '/html/body/div[1]/div/div[3]/div[2]/div/div[4]/div[2]/div/div/div/div[2]/div/div[7]/div/div/div/div[1]/input'
-       
-        # #Botão Pesquisar
-        botao_pesquisar = '//*[@id="app"]/div/div[3]/div[2]/div/div[4]/div[2]/div/div/div/div[2]/div/div[8]/button[2]'
-        
-        #Selecionar forma de pagamento e confirmar
         selecionar_e_pesquisar(
             driver,
             xpath_campo_input=xpath_campo_forma_pagamento,
             texto_busca=forma_pgto,
             texto_item_alvo=forma_pgto,
-            xpath_botao_pesquisar=botao_pesquisar ,
+            xpath_botao_pesquisar=botao_pesquisar,
         )
-        
-    
+    except AutocompleteSelecaoError:
+        raise  # sem dados não é falha técnica; quem chama decide
     except Exception:
         Log.write_log("Falha em filtrar o pagto")
         raise
+
+
 
 def atualizar_dados(driver: WebDriver) -> None:
     try:
@@ -477,3 +501,104 @@ def download_relatorio_softcase(driver: WebDriver) -> None:
     except Exception:
         Log.write_log("Falha download antes da alteração")
         raise
+
+#Tratar forma de pagamento Dinheiro
+def _obter_numeros_dinheiro(driver: WebDriver) -> list[str]:
+    """Retorna os 'Numero' das linhas cuja forma de pagamento é DINHEIRO."""
+    numeros: list[str] = []
+    for linha in driver.find_elements(By.XPATH, XPATH_LINHAS):
+        forma = linha.find_element(
+            By.CSS_SELECTOR, 'td[data-label="Forma de pagamento"]'
+        ).text.strip().upper()
+        if forma == FORMA_PAGAMENTO_ALVO:
+            numeros.append(
+                linha.find_element(
+                    By.CSS_SELECTOR, 'td[data-label="Numero"]'
+                ).text.strip()
+            )
+    return numeros
+
+
+def _clicar_editar(driver: WebDriver, wait: WebDriverWait, numero: str) -> None:
+    """Abre Ações > Editar da linha identificada pelo Numero."""
+    linha = driver.find_element(
+        By.XPATH,
+        f"{XPATH_LINHAS}[td[@data-label='Numero' "
+        f"and normalize-space()='{numero}']]",
+    )
+    botao = linha.find_element(By.XPATH, XPATH_BOTAO_ACOES)
+    driver.execute_script(
+        "arguments[0].scrollIntoView({block: 'center'});", botao
+    )
+
+    try:
+        wait.until(EC.element_to_be_clickable(botao)).click()
+        wait.until(
+            EC.visibility_of_element_located((By.XPATH, XPATH_POPOVER_ABERTO))
+        )
+    except TimeoutException:
+        logger.warning("Menu Ações não abriu com click normal; usando JS.")
+        driver.execute_script("arguments[0].click();", botao)
+        wait.until(
+            EC.visibility_of_element_located((By.XPATH, XPATH_POPOVER_ABERTO))
+        )
+
+    item = wait.until(
+        EC.visibility_of_element_located((By.XPATH, XPATH_MENU_EDITAR))
+    )
+    try:
+        item.click()
+    except Exception:  # click interceptado pela animação do popover
+        driver.execute_script("arguments[0].click();", item)
+
+
+def tratar_dias_comp_dinheiro(
+    driver: WebDriver, dias_comp_dinheiro: str | int
+) -> int:
+    """Atualiza o 'Dias Comp.' de todas as linhas DINHEIRO da tela.
+
+    Args:
+        driver: WebDriver já posicionado na tela de RPS Consolidados.
+        dias_comp_dinheiro: Valor a ser informado no campo Dias Comp.
+
+    Returns:
+        Quantidade de linhas atualizadas.
+
+    Raises:
+        TimeoutException: Se algum elemento não carregar no prazo.
+    """
+    wait = WebDriverWait(driver, TIMEOUT_PADRAO)
+    valor = str(dias_comp_dinheiro)
+
+    numeros = _obter_numeros_dinheiro(driver)
+    if not numeros:
+        logger.info("Nenhuma linha DINHEIRO encontrada.")
+        return 0
+
+    logger.info("Linhas DINHEIRO encontradas: %s", numeros)
+    atualizadas = 0
+
+    for numero in numeros:
+        logger.info("Editando RPS %s (Dias Comp.=%s)", numero, valor)
+        _clicar_editar(driver, wait, numero)
+
+        wait.until(EC.visibility_of_element_located((By.XPATH, XPATH_DIALOGO)))
+        campo = wait.until(
+            EC.element_to_be_clickable((By.XPATH, XPATH_CAMPO_DIAS_COMP))
+        )
+        # Ctrl+A + digitar + TAB para o Blazor registrar o binding
+        campo.click()
+        campo.send_keys(Keys.CONTROL, "a")
+        campo.send_keys(Keys.DELETE)
+        campo.send_keys(valor)
+        campo.send_keys(Keys.TAB)
+
+        wait.until(
+            EC.element_to_be_clickable((By.XPATH, XPATH_BOTAO_ATUALIZAR))
+        ).click()
+        wait.until(
+            EC.invisibility_of_element_located((By.XPATH, XPATH_DIALOGO))
+        )
+        atualizadas += 1
+
+    return atualizadas
